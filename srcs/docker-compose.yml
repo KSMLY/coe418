@@ -23,10 +23,21 @@ services:
     container_name: gamehub-adminer
     environment:
       ADMINER_DEFAULT_SERVER: mariadb
-    ports:
-      - "8080:8080"
     depends_on:
       - mariadb
+    networks:
+      - gamehub-network
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: gamehub-nginx
+    ports:
+      - "4430:443"
+    depends_on:
+      - adminer
     networks:
       - gamehub-network
     restart: unless-stopped
