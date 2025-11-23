@@ -1,0 +1,46 @@
+services:
+  mariadb:
+    build:
+      context: ./mariadb
+      dockerfile: Dockerfile
+    container_name: gamehub-mariadb
+    secrets:
+      - db_root_password
+      - db_password
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MYSQL_PASSWORD_FILE: /run/secrets/db_password
+      MYSQL_DATABASE: gamehub
+      MYSQL_USER: gamehub_user
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - gamehub-network
+    restart: unless-stopped
+
+  adminer:
+    image: adminer:latest
+    container_name: gamehub-adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: mariadb
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mariadb
+    networks:
+      - gamehub-network
+    restart: unless-stopped
+
+secrets:
+  db_root_password:
+    file: ./secrets/db_root_password.txt
+  db_password:
+    file: ./secrets/db_password.txt
+
+volumes:
+  mariadb_data:
+    driver: local
+
+networks:
+  gamehub-network:
+    driver: bridge

@@ -1,0 +1,4 @@
+[mysqld]
+
+port = 3306
+datadir = /var/lib/mysql
