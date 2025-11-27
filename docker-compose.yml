@@ -1,7 +1,7 @@
 services:
   mariadb:
     build:
-      context: ./mariadb
+      context: srcs/mariadb
       dockerfile: Dockerfile
     container_name: gamehub-mariadb
     secrets:
@@ -31,11 +31,11 @@ services:
 
   nginx:
     build:
-      context: ./nginx
+      context: srcs/nginx
       dockerfile: Dockerfile
     container_name: gamehub-nginx
     ports:
-      - "4430:443"
+      - "443:443"
     depends_on:
       - adminer
     networks:
@@ -44,9 +44,9 @@ services:
 
 secrets:
   db_root_password:
-    file: ./secrets/db_root_password.txt
+    file: srcs/secrets/db_root_password.txt
   db_password:
-    file: ./secrets/db_password.txt
+    file: srcs/secrets/db_password.txt
 
 volumes:
   mariadb_data:
