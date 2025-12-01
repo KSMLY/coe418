@@ -3,6 +3,8 @@ from datetime import datetime, date
 from typing import Optional, List
 from models import PlayStatus, Rarity, FriendshipStatus 
 
+# ============= USER SCHEMAS =============
+
 # POST /register/ (Input)
 class UserCreate(BaseModel):
     username: str = Field(..., max_length=50)
@@ -15,7 +17,7 @@ class UserLogin(BaseModel):
     username: str 
     password: str
 
-# GET /profile/{user_id}, POST /register/ (Output)
+# GET /profile/, POST /register/ (Output)
 class UserOut(BaseModel):
     user_id: str
     username: str
@@ -36,14 +38,56 @@ class UserPublicOut(BaseModel):
     class Config:
         from_attributes = True
 
+# PUT /profile/ (Input)
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = Field(None, max_length=100)
     display_name: Optional[str] = Field(None, max_length=100)
 
-# POST /games/{igdb_id}/add/ (Input)
+# ============= GAME SCHEMAS =============
+
+# POST /games/ (Input - Create new game in database)
+class GameCreate(BaseModel):
+    external_api_id: Optional[str] = Field(None, max_length=100)
+    title: str = Field(..., max_length=255)
+    developer: Optional[str] = Field(None, max_length=100)
+    release_date: Optional[date] = None
+    cover_image_url: Optional[str] = None
+    genres: Optional[List[str]] = []
+    platforms: Optional[List[str]] = []
+
+# GET /games/, GET /games/{game_id}/ (Output)
+class GameOut(BaseModel):
+    game_id: str
+    external_api_id: Optional[str] = None
+    title: str
+    developer: Optional[str] = None
+    release_date: Optional[date] = None
+    cover_image_url: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+# GET /games/ with genres and platforms
+class GameDetailOut(BaseModel):
+    game_id: str
+    external_api_id: Optional[str] = None
+    title: str
+    developer: Optional[str] = None
+    release_date: Optional[date] = None
+    cover_image_url: Optional[str] = None
+    genres: List[str] = []
+    platforms: List[str] = []
+    
+    class Config:
+        from_attributes = True
+
+# ============= COLLECTION SCHEMAS =============
+
+# POST /collection/{game_id}/add/ (Input)
 class UserGameAdd(BaseModel):
-    external_api_id: str = Field(..., description="External game ID for API lookup.")
     play_status: Optional[PlayStatus] = PlayStatus.NOT_STARTED
+    personal_notes: Optional[str] = None
+    rating: Optional[int] = Field(None, ge=1, le=5)
 
 # PUT /collection/{game_id}/status/ (Input)
 class UserGameStatusUpdate(BaseModel):
@@ -53,11 +97,17 @@ class UserGameStatusUpdate(BaseModel):
 class UserGameRatingUpdate(BaseModel):
     rating: int = Field(..., ge=1, le=5, description="Personal rating from 1 to 5.")
 
+# PUT /collection/{game_id}/notes/ (Input)
+class UserGameNotesUpdate(BaseModel):
+    personal_notes: Optional[str] = None
+
 # GET /collection/ (Output)
 class UserGameOut(BaseModel):
     game_id: str
     title: str
+    developer: Optional[str] = None
     release_date: Optional[date] = None
+    cover_image_url: Optional[str] = None
     
     # UserGames data
     play_status: PlayStatus
@@ -66,6 +116,8 @@ class UserGameOut(BaseModel):
     
     class Config:
         from_attributes = True
+
+# ============= ACHIEVEMENT SCHEMAS =============
 
 # Base Achievement Definition (Output for GET /collection/{game_id}/achievements/)
 class AchievementOut(BaseModel):
@@ -86,10 +138,17 @@ class UserAchievementOut(AchievementOut):
 class UserAchievementComplete(BaseModel):
     date_earned: Optional[datetime] = None
 
+# ============= REVIEW SCHEMAS =============
+
 # POST /games/{game_id}/reviews/ (Input)
 class ReviewCreate(BaseModel):
     review_text: Optional[str] = None
     rating: int = Field(..., ge=1, le=5, description="Review rating from 1 to 5 stars.")
+
+# PUT /reviews/{review_id}/ (Input)
+class ReviewUpdate(BaseModel):
+    review_text: Optional[str] = None
+    rating: Optional[int] = Field(None, ge=1, le=5)
 
 # GET /games/{game_id}/reviews/ (Output)
 class ReviewOut(BaseModel):
@@ -103,6 +162,8 @@ class ReviewOut(BaseModel):
     class Config:
         from_attributes = True
 
+# ============= FRIENDS SCHEMAS =============
+
 # GET /friends/ (Output)
 class FriendRequestOut(BaseModel):
     friendship_id: str
@@ -113,6 +174,8 @@ class FriendRequestOut(BaseModel):
     
     class Config:
         from_attributes = True
+
+# ============= PLAY SESSION SCHEMAS =============
         
 # POST /sessions/start/ (Input)
 class PlaySessionStart(BaseModel):
