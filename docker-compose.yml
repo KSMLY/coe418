@@ -57,6 +57,8 @@ services:
       - mariadb
     networks:
       - gamehub-network
+    volumes:
+      - app_uploads:/app/uploads
     restart: unless-stopped
 
 secrets:
@@ -69,6 +71,8 @@ secrets:
 
 volumes:
   mariadb_data:
+    driver: local
+  app_uploads:
     driver: local
 
 networks:

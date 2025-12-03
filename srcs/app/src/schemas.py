@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime, date
 from typing import Optional, List
-from models import PlayStatus, Rarity, FriendshipStatus 
+from models import Role, PlayStatus, Rarity, FriendshipStatus 
 
 # ============= USER SCHEMAS =============
 
@@ -9,7 +9,7 @@ from models import PlayStatus, Rarity, FriendshipStatus
 class UserCreate(BaseModel):
     username: str = Field(..., max_length=50)
     email: EmailStr = Field(..., max_length=100)
-    password: str
+    password: str = Field(..., min_length=8, max_length=32)
     display_name: Optional[str] = Field(None, max_length=100)
 
 # POST /login/ (Input)
@@ -23,16 +23,20 @@ class UserOut(BaseModel):
     username: str
     email: EmailStr
     display_name: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    role: Role
     join_date: datetime
     
     class Config:
-        from_attributes = True 
+        from_attributes = True
 
 # GET /users/{user_id} (Output for public viewing)
 class UserPublicOut(BaseModel):
     user_id: str
     username: str
     display_name: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    role: Role
     join_date: datetime
     
     class Config:
@@ -119,11 +123,20 @@ class UserGameOut(BaseModel):
 
 # ============= ACHIEVEMENT SCHEMAS =============
 
+# POST /achievements/games/{game_id}/achievements/ (Input)
+class AchievementCreate(BaseModel):
+    achievement_name: str = Field(..., max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    icon_url: Optional[str] = None
+    rarity: Optional[Rarity] = None
+    points_value: int = Field(default=0, ge=0)
+
 # Base Achievement Definition (Output for GET /collection/{game_id}/achievements/)
 class AchievementOut(BaseModel):
     achievement_id: str
     achievement_name: str
     description: Optional[str] = None
+    icon_url: Optional[str] = None
     rarity: Optional[Rarity] = None
     points_value: int
     
@@ -134,7 +147,7 @@ class AchievementOut(BaseModel):
 class UserAchievementOut(AchievementOut):
     date_earned: datetime
 
-# POST /achievements/{achievement_id}/complete/ (Input - body is optional)
+# POST /achievements/{achievement_id}/complete/ (Input)
 class UserAchievementComplete(BaseModel):
     date_earned: Optional[datetime] = None
 

@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS USER (
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(225) NOT NULL,
     display_name VARCHAR(100),
+    profile_picture_url TEXT,
+    user_role ENUM('user', 'admin') DEFAULT 'user' NOT NULL
     join_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -39,6 +41,7 @@ CREATE TABLE IF NOT EXISTS ACHIEVEMENT (
     description TEXT,
     rarity ENUM('common', 'uncommon', 'rare', 'epic', 'legendary'),
     points_value INT DEFAULT 0,
+    icon_url TEXT,
     FOREIGN KEY (game_id) REFERENCES GAME(game_id) ON DELETE CASCADE
 );
 

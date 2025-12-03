@@ -12,27 +12,45 @@ router = APIRouter(prefix="", tags=["Authentication"])
 
 @router.post("/register/", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
 async def register(user_data: schemas.UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(
-        (User.username == user_data.username) | (User.email == user_data.email)
-    ).first()
+    # Check username
+    username_exists = db.query(User).filter(User.username == user_data.username).first()
+    if username_exists:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already taken"
+        )
     
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username or email already exists")
+    # Check email
+    email_exists = db.query(User).filter(User.email == user_data.email).first()
+    if email_exists:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
     
-    hashed_password = hash_password(user_data.password)
+    try:
+        hashed_password = hash_password(user_data.password)
+        
+        new_user = User(
+            username=user_data.username,
+            email=user_data.email,
+            password_hash=hashed_password,
+            display_name=user_data.display_name
+        )
+        
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        return new_user
     
-    new_user = User(
-        username=user_data.username,
-        email=user_data.email,
-        password_hash=hashed_password,
-        display_name=user_data.display_name
-    )
-    
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    return new_user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user account"
+        )
+
 
 @router.post("/login")
 async def login(

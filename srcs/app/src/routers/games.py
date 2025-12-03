@@ -5,18 +5,18 @@ from typing import List, Optional
 
 from database import get_db
 from models import Game, GameGenre, GamePlatform
-from dependencies import CurrentUser
+from dependencies import CurrentAdmin
 from services.igdb import igdb_service
 import schemas
 
 router = APIRouter(prefix="/games", tags=["Games"])
 
+# PUBLIC - Search IGDB
 @router.get("/search-igdb/")
 async def search_igdb_games(
     search: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=50)
 ):
-    """Search for games in IGDB external database."""
     try:
         results = await igdb_service.search_games(search, limit)
         formatted_results = [igdb_service.format_game_data(game) for game in results]
@@ -24,10 +24,11 @@ async def search_igdb_games(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"IGDB API error: {str(e)}")
 
+# ADMIN ONLY - Import from IGDB
 @router.post("/import-from-igdb/{igdb_id}", response_model=schemas.GameOut, status_code=status.HTTP_201_CREATED)
 async def import_game_from_igdb(
     igdb_id: int,
-    current_user: CurrentUser,
+    current_admin: CurrentAdmin,
     db: Session = Depends(get_db)
 ):
     # Check if already exists
@@ -73,10 +74,11 @@ async def import_game_from_igdb(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error importing game: {str(e)}")
 
+# ADMIN ONLY - Create game manually
 @router.post("/", response_model=schemas.GameOut, status_code=status.HTTP_201_CREATED)
 async def create_game(
     game_data: schemas.GameCreate,
-    current_user: CurrentUser,
+    current_admin: CurrentAdmin,
     db: Session = Depends(get_db)
 ):
     if game_data.external_api_id:
@@ -108,6 +110,7 @@ async def create_game(
     
     return new_game
 
+# PUBLIC - Browse/search games
 @router.get("/", response_model=List[schemas.GameDetailOut])
 async def get_games(
     search: Optional[str] = None,
@@ -151,6 +154,7 @@ async def get_games(
     
     return result
 
+# PUBLIC - Get specific game
 @router.get("/{game_id}/", response_model=schemas.GameDetailOut)
 async def get_game(game_id: str, db: Session = Depends(get_db)):
     game = db.query(Game).filter(Game.game_id == game_id).first()
@@ -170,3 +174,57 @@ async def get_game(game_id: str, db: Session = Depends(get_db)):
     }
     
     return schemas.GameDetailOut(**game_dict)
+
+# ADMIN ONLY - Update game
+@router.put("/{game_id}/", response_model=schemas.GameOut)
+async def update_game(
+    game_id: str,
+    game_data: schemas.GameCreate,
+    current_admin: CurrentAdmin,
+    db: Session = Depends(get_db)
+):
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    # Update basic fields
+    game.title = game_data.title
+    if game_data.developer is not None:
+        game.developer = game_data.developer
+    if game_data.release_date is not None:
+        game.release_date = game_data.release_date
+    if game_data.cover_image_url is not None:
+        game.cover_image_url = game_data.cover_image_url
+    if game_data.external_api_id is not None:
+        game.external_api_id = game_data.external_api_id
+    
+    # Update genres
+    if game_data.genres is not None:
+        db.query(GameGenre).filter(GameGenre.game_id == game_id).delete()
+        for genre in game_data.genres:
+            db.add(GameGenre(game_id=game_id, genre=genre))
+    
+    # Update platforms
+    if game_data.platforms is not None:
+        db.query(GamePlatform).filter(GamePlatform.game_id == game_id).delete()
+        for platform in game_data.platforms:
+            db.add(GamePlatform(game_id=game_id, platform=platform))
+    
+    db.commit()
+    db.refresh(game)
+    return game
+
+# ADMIN ONLY - Delete game
+@router.delete("/{game_id}/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_game(
+    game_id: str,
+    current_admin: CurrentAdmin,
+    db: Session = Depends(get_db)
+):
+    game = db.query(Game).filter(Game.game_id == game_id).first()
+    if not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    db.delete(game)
+    db.commit()
+    return None

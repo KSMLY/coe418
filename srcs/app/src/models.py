@@ -24,6 +24,10 @@ class FriendshipStatus(enum.Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
 
+class Role(enum.Enum):
+    USER = 'user'
+    ADMIN = 'admin'
+
 class User(Base):
     __tablename__ = "USER"
     
@@ -33,7 +37,9 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     display_name = Column(String(100))
     join_date = Column(DateTime, default=datetime.utcnow)
-    
+    role = Column(Enum(Role), default=Role.USER, nullable=False)
+    profile_picture_url = Column(Text)
+
     games = relationship("UserGames", back_populates="user")
     achievements = relationship("UserAchievements", back_populates="user")
     reviews = relationship("Review", back_populates="user")
@@ -91,7 +97,8 @@ class Achievement(Base):
     description = Column(Text)
     rarity = Column(Enum(Rarity))
     points_value = Column(Integer, default=0)
-    
+    icon_url = Column(Text)
+
     game = relationship("Game", back_populates="achievements")
     user_achievements = relationship("UserAchievements", back_populates="achievement")
 

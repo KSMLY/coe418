@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import Annotated
 
 from database import get_db
-from models import User
+from models import User, Role
 from password import verify_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
@@ -13,7 +13,6 @@ def get_current_user(
     db: Session = Depends(get_db), 
     token: str = Depends(oauth2_scheme)
 ) -> User:
-    """Dependency to get the current authenticated user."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -32,5 +31,16 @@ def get_current_user(
     
     return user
 
+def get_current_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if current_user.role != Role.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
+
 # Type alias for convenience
 CurrentUser = Annotated[User, Depends(get_current_user)]
+CurrentAdmin = Annotated[User, Depends(get_current_admin)] 

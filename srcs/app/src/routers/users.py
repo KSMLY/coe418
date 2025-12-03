@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
 
 from database import get_db
-from models import User
-from dependencies import CurrentUser
+from models import Role, User
+from dependencies import CurrentUser, CurrentAdmin
 import schemas
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -42,4 +43,48 @@ async def get_user_profile(user_id: str, db: Session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         
+    return user
+
+@router.get("/", response_model=List[schemas.UserOut])
+async def get_all_users(
+    current_admin: CurrentAdmin,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    users = db.query(User).offset(skip).limit(limit).all()
+    return users
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: str,
+    current_admin: CurrentAdmin,
+    db: Session = Depends(get_db)
+):
+    # Don't let admin delete themselves
+    if user_id == current_admin.user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    db.delete(user)
+    db.commit()
+    return None
+
+@router.put("/{user_id}/role", response_model=schemas.UserOut)
+async def change_user_role(
+    user_id: str,
+    new_role: Role,
+    current_admin: CurrentAdmin,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.role = new_role
+    db.commit()
+    db.refresh(user)
     return user

@@ -1,6 +1,8 @@
 FROM python:3.11-slim
 
 WORKDIR /app
+RUN mkdir -p /app/uploads/profiles
+RUN mkdir -p /app/uploads/achievements
 
 # Copy requirements and install dependencies
 COPY conf/requirements.txt .
