@@ -5,7 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 
 from database import create_tables
-from routers import auth, users, games, collection, achievements, uploads
+from routers import auth, users, games, collection, achievements, uploads, reviews, sessions, friends
 from exceptions import database_exception_handler, exception_handler
 
 app = FastAPI(title="GameHub API")
@@ -25,6 +25,9 @@ app.include_router(games.router)
 app.include_router(collection.router)
 app.include_router(achievements.router)
 app.include_router(uploads.router)
+app.include_router(reviews.router)
+app.include_router(sessions.router)
+app.include_router(friends.router)
 
 @app.on_event("startup")
 def on_startup():
