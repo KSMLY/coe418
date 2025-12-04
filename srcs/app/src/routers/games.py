@@ -6,43 +6,45 @@ from typing import List, Optional
 from database import get_db
 from models import Game, GameGenre, GamePlatform
 from dependencies import CurrentAdmin
-from services.igdb import igdb_service
+from services.rawg import rawg_service
 import schemas
 
 router = APIRouter(prefix="/games", tags=["Games"])
 
-# PUBLIC - Search IGDB
-@router.get("/search-igdb/")
-async def search_igdb_games(
+# PUBLIC - Search RAWG
+@router.get("/search-rawg/")
+async def search_rawg_games(
     search: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=50)
 ):
+    """Search for games in RAWG database."""
     try:
-        results = await igdb_service.search_games(search, limit)
-        formatted_results = [igdb_service.format_game_data(game) for game in results]
+        results = await rawg_service.search_games(search, limit)
+        formatted_results = [rawg_service.format_game_data(game) for game in results]
         return {"results": formatted_results}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"IGDB API error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"RAWG API error: {str(e)}")
 
-# ADMIN ONLY - Import from IGDB
-@router.post("/import-from-igdb/{igdb_id}", response_model=schemas.GameOut, status_code=status.HTTP_201_CREATED)
-async def import_game_from_igdb(
-    igdb_id: int,
+# ADMIN ONLY - Import from RAWG
+@router.post("/import-from-rawg/{rawg_id}", response_model=schemas.GameOut, status_code=status.HTTP_201_CREATED)  # ← CHANGED endpoint name
+async def import_game_from_rawg(
+    rawg_id: int,
     current_admin: CurrentAdmin,
     db: Session = Depends(get_db)
 ):
+    """Import a game from RAWG into the local database (Admin only)."""
     # Check if already exists
-    existing = db.query(Game).filter(Game.external_api_id == str(igdb_id)).first()
+    existing = db.query(Game).filter(Game.external_api_id == str(rawg_id)).first()
     if existing:
         raise HTTPException(status_code=400, detail="Game already in database")
     
-    # Fetch from IGDB
+    # Fetch from RAWG
     try:
-        igdb_data = await igdb_service.get_game_by_id(igdb_id)
-        if not igdb_data:
-            raise HTTPException(status_code=404, detail="Game not found in IGDB")
+        rawg_data = await rawg_service.get_game_by_id(rawg_id)
+        if not rawg_data:
+            raise HTTPException(status_code=404, detail="Game not found in RAWG")
         
-        formatted = igdb_service.format_game_data(igdb_data)
+        formatted = rawg_service.format_game_data(rawg_data)
         
         # Create game in database
         new_game = Game(
@@ -81,6 +83,7 @@ async def create_game(
     current_admin: CurrentAdmin,
     db: Session = Depends(get_db)
 ):
+    """Create a new game entry manually (Admin only)."""
     if game_data.external_api_id:
         existing = db.query(Game).filter(
             Game.external_api_id == game_data.external_api_id
@@ -110,7 +113,7 @@ async def create_game(
     
     return new_game
 
-# PUBLIC - Browse/search games
+# PUBLIC - Browse/search games in local database
 @router.get("/", response_model=List[schemas.GameDetailOut])
 async def get_games(
     search: Optional[str] = None,
@@ -120,6 +123,7 @@ async def get_games(
     limit: int = 20,
     db: Session = Depends(get_db)
 ):
+    """Browse and search games in local database."""
     query = db.query(Game)
     
     if search:
@@ -157,6 +161,7 @@ async def get_games(
 # PUBLIC - Get specific game
 @router.get("/{game_id}/", response_model=schemas.GameDetailOut)
 async def get_game(game_id: str, db: Session = Depends(get_db)):
+    """Get detailed information about a specific game."""
     game = db.query(Game).filter(Game.game_id == game_id).first()
     
     if not game:
@@ -183,6 +188,7 @@ async def update_game(
     current_admin: CurrentAdmin,
     db: Session = Depends(get_db)
 ):
+    """Update game information (Admin only)."""
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -221,6 +227,7 @@ async def delete_game(
     current_admin: CurrentAdmin,
     db: Session = Depends(get_db)
 ):
+    """Delete a game (Admin only)."""
     game = db.query(Game).filter(Game.game_id == game_id).first()
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")

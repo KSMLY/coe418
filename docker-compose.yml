@@ -35,7 +35,7 @@ services:
       dockerfile: Dockerfile
     container_name: gamehub-nginx
     ports:
-      - "4430:443"
+      - "443:443"
     depends_on:
       - adminer
     networks:
@@ -50,13 +50,11 @@ services:
     secrets:
       - db_password
       - key
-      - igdb_id
-      - igdb_secret
+      - rawg_api_key
     environment:
       - DB_PASSWORD_FILE=/run/secrets/db_password
       - KEY_FILE=/run/secrets/key
-      - IGDB_CLIENT_ID_FILE=/run/secrets/igdb_id
-      - IGDB_CLIENT_SECRET_FILE=/run/secrets/igdb_secret
+      - RAWG_API_KEY=/run/secrets/rawg_api_key
     depends_on:
       - mariadb
     networks:
@@ -70,10 +68,8 @@ secrets:
     file: srcs/secrets/db_root_password.txt
   db_password:
     file: srcs/secrets/db_password.txt
-  igdb_id:
-    file: srcs/secrets/igdb_id.txt
-  igdb_secret:
-    file: srcs/secrets/igdb_secret.txt
+  rawg_api_key:
+    file: srcs/secrets/rawg_api_key.txt
   key:
     file: srcs/secrets/key.txt
 
