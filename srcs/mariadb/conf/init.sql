@@ -1,4 +1,8 @@
-USE gamehub;
+CREATE DATABASE IF NOT EXISTS gamehub;
+CREATE USER IF NOT EXISTS 'gamehub_user'@'%' IDENTIFIED BY '${DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON gamehub.* TO 'gamehub_user'@'%';
+FLUSH PRIVILEGES;
+use gamehub;
 
 CREATE TABLE IF NOT EXISTS USER (
     user_id VARCHAR(36) PRIMARY KEY,
@@ -7,7 +11,7 @@ CREATE TABLE IF NOT EXISTS USER (
     password_hash VARCHAR(225) NOT NULL,
     display_name VARCHAR(100),
     profile_picture_url TEXT,
-    user_role ENUM('user', 'admin') DEFAULT 'user' NOT NULL
+    user_role ENUM('user', 'admin') DEFAULT 'user' NOT NULL,
     join_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

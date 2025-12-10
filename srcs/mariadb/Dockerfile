@@ -1,7 +1,7 @@
-FROM mariadb:10.11
+FROM mariadb:latest
 
-COPY conf/mariadb.cnf /etc/mysql/mariadb.conf.d/50-server.conf
+# Copy initialization script from conf directory
 COPY conf/init.sql /docker-entrypoint-initdb.d/
 
-EXPOSE 3306
-
+# Set correct permissions
+RUN chmod 644 /docker-entrypoint-initdb.d/init.sql

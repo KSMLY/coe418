@@ -19,8 +19,13 @@ class RAWGService:
     BASE_URL = "https://api.rawg.io/api"
     
     def __init__(self):
-        with open(os.getenv("RAWG_API_FILE", 'r')) as f:
-            self.api_key = f.read().strip()
+        # Fixed: Changed RAWG_API_FILE to RAWG_API_KEY and removed 'r' from open mode
+        api_key_file = os.getenv("RAWG_API_KEY")
+        if api_key_file:
+            with open(api_key_file, 'r') as f:
+                self.api_key = f.read().strip()
+        else:
+            self.api_key = None
         
         if not self.api_key:
             print("Warning: RAWG_API_KEY not set. API calls will fail.")

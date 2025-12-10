@@ -29,19 +29,6 @@ services:
       - gamehub-network
     restart: unless-stopped
 
-  nginx:
-    build:
-      context: srcs/nginx
-      dockerfile: Dockerfile
-    container_name: gamehub-nginx
-    ports:
-      - "443:443"
-    depends_on:
-      - adminer
-    networks:
-      - gamehub-network
-    restart: unless-stopped
-
   app:
     build:
       context: srcs/app
@@ -61,6 +48,32 @@ services:
       - gamehub-network
     volumes:
       - app_uploads:/app/uploads
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: srcs/frontend
+      dockerfile: Dockerfile
+    container_name: gamehub-frontend
+   
+    networks:
+      - gamehub-network
+    restart: unless-stopped
+    
+
+  nginx:
+    build:
+      context: srcs/nginx
+      dockerfile: Dockerfile
+    container_name: gamehub-nginx
+    ports:
+      - "443:443"
+    depends_on:
+      - adminer
+      - app
+      - frontend
+    networks:
+      - gamehub-network
     restart: unless-stopped
 
 secrets:
