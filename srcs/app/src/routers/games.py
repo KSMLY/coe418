@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from database import get_db
 from models import Game, GameGenre, GamePlatform
-from dependencies import CurrentAdmin
+from dependencies import CurrentAdmin, CurrentUser
 from services.rawg import rawg_service
 import schemas
 
@@ -25,18 +25,19 @@ async def search_rawg_games(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAWG API error: {str(e)}")
 
-# ADMIN ONLY - Import from RAWG
-@router.post("/import-from-rawg/{rawg_id}", response_model=schemas.GameOut, status_code=status.HTTP_201_CREATED)  # ← CHANGED endpoint name
+# CHANGED: Allow any authenticated user to import (not just admin)
+@router.post("/import-from-rawg/{rawg_id}", response_model=schemas.GameOut, status_code=status.HTTP_201_CREATED)
 async def import_game_from_rawg(
     rawg_id: int,
-    current_admin: CurrentAdmin,
+    current_user: CurrentUser,  # Changed from CurrentAdmin to CurrentUser
     db: Session = Depends(get_db)
 ):
-    """Import a game from RAWG into the local database (Admin only)."""
+    """Import a game from RAWG into the local database (Authenticated users)."""
     # Check if already exists
     existing = db.query(Game).filter(Game.external_api_id == str(rawg_id)).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Game already in database")
+        # Return existing game instead of error (allow adding to collection)
+        return existing
     
     # Fetch from RAWG
     try:
@@ -59,11 +60,11 @@ async def import_game_from_rawg(
         db.flush()
         
         # Add genres
-        for genre in formatted["genres"]:
+        for genre in formatted.get("genres", []):
             db.add(GameGenre(game_id=new_game.game_id, genre=genre))
         
         # Add platforms
-        for platform in formatted["platforms"]:
+        for platform in formatted.get("platforms", []):
             db.add(GamePlatform(game_id=new_game.game_id, platform=platform))
         
         db.commit()

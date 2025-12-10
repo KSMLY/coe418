@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, LogOut, Library, Star, Calendar, Gamepad2 } from 'lucide-react';
+import { Search, LogOut, Library, Star, Calendar, Gamepad2, Plus, Loader, AlertCircle } from 'lucide-react';
 
 // API Configuration
 const API_BASE = 'https://localhost/api';
@@ -24,9 +24,9 @@ const api = {
       window.location.reload();
     }
 
-    if (!response.ok && response.status !== 404) {
+    if (!response.ok && response.status !== 204) {
       const error = await response.json().catch(() => ({ detail: 'Request failed' }));
-      throw new Error(error.detail || 'Request failed');
+      throw new Error(error.detail || `Request failed with status ${response.status}`);
     }
 
     return response.status === 204 ? null : response.json();
@@ -107,6 +107,22 @@ function AuthProvider({ children }) {
     <AuthContext.Provider value={{ user, loading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
+  );
+}
+
+// Error Toast Component
+function ErrorToast({ message, onClose }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="fixed top-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 max-w-md z-50 animate-slide-in">
+      <AlertCircle className="w-5 h-5 flex-shrink-0" />
+      <p className="flex-1">{message}</p>
+      <button onClick={onClose} className="text-white hover:text-red-200 font-bold">×</button>
+    </div>
   );
 }
 
@@ -221,7 +237,7 @@ function AuthPage() {
 }
 
 // Game Card Component
-function GameCard({ game, onSelect }) {
+function GameCard({ game, onSelect, isRAWG = false }) {
   return (
     <div
       onClick={() => onSelect(game)}
@@ -240,24 +256,58 @@ function GameCard({ game, onSelect }) {
         {game.release_date && (
           <p className="text-slate-500 text-xs mt-1">{new Date(game.release_date).getFullYear()}</p>
         )}
+        {isRAWG && (
+          <div className="mt-2 bg-purple-600/20 text-purple-300 text-xs px-2 py-1 rounded inline-block">
+            From RAWG
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // Game Details Modal
-function GameDetailsModal({ game, onClose, onAddToCollection }) {
+function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false }) {
   const [loading, setLoading] = useState(false);
   const [playStatus, setPlayStatus] = useState('not_started');
   const [rating, setRating] = useState(null);
+  const [error, setError] = useState('');
 
   const handleAdd = async () => {
     setLoading(true);
+    setError('');
+    
     try {
-      await onAddToCollection(game.game_id, { play_status: playStatus, rating });
+      console.log('Adding game:', game);
+      console.log('Is RAWG:', isRAWG);
+      console.log('External API ID:', game.external_api_id);
+      
+      if (isRAWG) {
+        // First import the game from RAWG
+        const rawgId = game.external_api_id;
+        if (!rawgId) {
+          throw new Error('RAWG ID is missing from game data');
+        }
+        
+        console.log('Importing from RAWG with ID:', rawgId);
+        const importedGame = await api.post(`/games/import-from-rawg/${rawgId}`);
+        console.log('Imported game:', importedGame);
+        
+        // Now add to collection with the new game_id
+        console.log('Adding to collection with game_id:', importedGame.game_id);
+        await onAddToCollection(importedGame.game_id, { play_status: playStatus, rating });
+      } else {
+        // Game already in database
+        if (!game.game_id) {
+          throw new Error('Game ID is missing');
+        }
+        console.log('Adding existing game to collection:', game.game_id);
+        await onAddToCollection(game.game_id, { play_status: playStatus, rating });
+      }
       onClose();
     } catch (err) {
-      alert(err.message);
+      console.error('Error adding game:', err);
+      setError(err.message || 'Failed to add game');
     } finally {
       setLoading(false);
     }
@@ -307,6 +357,22 @@ function GameDetailsModal({ game, onClose, onAddToCollection }) {
             </div>
           )}
 
+          {isRAWG && (
+            <div className="mb-4 bg-blue-500/20 border border-blue-500 text-blue-200 px-4 py-2 rounded">
+              This game will be imported from RAWG database
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-4 bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Error:</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <label className="block text-slate-400 mb-2">Status:</label>
             <select
@@ -338,9 +404,19 @@ function GameDetailsModal({ game, onClose, onAddToCollection }) {
             <button
               onClick={handleAdd}
               disabled={loading}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-semibold disabled:opacity-50"
+              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {loading ? 'Adding...' : 'Add to Collection'}
+              {loading ? (
+                <>
+                  <Loader className="w-4 h-4 animate-spin" />
+                  {isRAWG ? 'Importing...' : 'Adding...'}
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  {isRAWG ? 'Import & Add' : 'Add to Collection'}
+                </>
+              )}
             </button>
             <button
               onClick={onClose}
@@ -364,6 +440,8 @@ function GameHub() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGame, setSelectedGame] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isRAWGSearch, setIsRAWGSearch] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (activeTab === 'discover') {
@@ -375,10 +453,12 @@ function GameHub() {
 
   const loadGames = async () => {
     setLoading(true);
+    setIsRAWGSearch(false);
     try {
       const data = await api.get('/games/');
       setGames(data);
     } catch (err) {
+      setError('Failed to load games: ' + err.message);
       console.error(err);
     } finally {
       setLoading(false);
@@ -391,6 +471,7 @@ function GameHub() {
       const data = await api.get('/collection/');
       setCollection(data);
     } catch (err) {
+      setError('Failed to load collection: ' + err.message);
       console.error(err);
     } finally {
       setLoading(false);
@@ -400,11 +481,12 @@ function GameHub() {
   const searchRAWG = async () => {
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setIsRAWGSearch(true);
     try {
       const data = await api.get(`/games/search-rawg/?search=${encodeURIComponent(searchQuery)}`);
       setGames(data.results || []);
     } catch (err) {
-      alert('Search failed: ' + err.message);
+      setError('Search failed: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -417,17 +499,29 @@ function GameHub() {
 
   const removeFromCollection = async (gameId) => {
     if (window.confirm('Remove this game from your collection?')) {
-      await api.delete(`/collection/${gameId}/`);
-      loadCollection();
+      try {
+        await api.delete(`/collection/${gameId}/`);
+        loadCollection();
+      } catch (err) {
+        setError('Failed to remove game: ' + err.message);
+      }
     }
   };
 
-  const filteredGames = games.filter(game =>
-    game.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleGameSelect = (game) => {
+    setSelectedGame({ ...game, isRAWG: isRAWGSearch });
+  };
+
+  const filteredGames = searchQuery && !isRAWGSearch
+    ? games.filter(game =>
+        game.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : games;
 
   return (
     <div className="min-h-screen bg-slate-900">
+      {error && <ErrorToast message={error} onClose={() => setError('')} />}
+      
       <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -437,6 +531,9 @@ function GameHub() {
           
           <div className="flex items-center gap-4">
             <span className="text-slate-300">{user?.display_name || user?.username}</span>
+            {user?.role === 'admin' && (
+              <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs">ADMIN</span>
+            )}
             <button
               onClick={logout}
               className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded"
@@ -451,7 +548,11 @@ function GameHub() {
       <div className="max-w-7xl mx-auto p-6">
         <div className="flex gap-4 mb-6">
           <button
-            onClick={() => setActiveTab('discover')}
+            onClick={() => {
+              setActiveTab('discover');
+              setSearchQuery('');
+              setIsRAWGSearch(false);
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded ${
               activeTab === 'discover' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
             }`}
@@ -466,37 +567,59 @@ function GameHub() {
             }`}
           >
             <Library className="w-4 h-4" />
-            My Collection
+            My Collection ({collection.length})
           </button>
         </div>
 
         {activeTab === 'discover' && (
-          <div className="mb-6 flex gap-3">
-            <input
-              type="text"
-              placeholder="Search games..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && searchRAWG()}
-              className="flex-1 px-4 py-2 bg-slate-800 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <button
-              onClick={searchRAWG}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-semibold"
-            >
-              Search RAWG
-            </button>
+          <div className="mb-6">
+            <div className="flex gap-3 mb-3">
+              <input
+                type="text"
+                placeholder="Search games..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && searchRAWG()}
+                className="flex-1 px-4 py-2 bg-slate-800 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <button
+                onClick={searchRAWG}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-semibold flex items-center gap-2"
+              >
+                <Search className="w-4 h-4" />
+                Search RAWG
+              </button>
+              <button
+                onClick={loadGames}
+                className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded font-semibold"
+              >
+                Browse Database
+              </button>
+            </div>
+            {isRAWGSearch && (
+              <div className="bg-purple-600/20 border border-purple-600 text-purple-200 px-4 py-2 rounded">
+                Searching RAWG database. Games will be imported when added to collection.
+              </div>
+            )}
           </div>
         )}
 
         {loading ? (
-          <div className="text-center text-slate-400 py-12">Loading...</div>
+          <div className="text-center text-slate-400 py-12 flex flex-col items-center gap-3">
+            <Loader className="w-8 h-8 animate-spin" />
+            <p>Loading...</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {activeTab === 'discover' ? (
               filteredGames.length > 0 ? (
                 filteredGames.map((game) => (
-                  <GameCard key={game.game_id || game.id} game={game} onSelect={setSelectedGame} />
+                  <GameCard 
+                    key={game.game_id || game.external_api_id} 
+                    game={game} 
+                    onSelect={handleGameSelect}
+                    isRAWG={isRAWGSearch}
+                  />
                 ))
               ) : (
                 <div className="col-span-full text-center text-slate-400 py-12">
@@ -510,10 +633,16 @@ function GameHub() {
                     <GameCard game={item} onSelect={() => {}} />
                     <button
                       onClick={() => removeFromCollection(item.game_id)}
-                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-2 rounded-full"
+                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-xl font-bold"
                     >
                       ×
                     </button>
+                    <div className="absolute bottom-2 left-2 right-2 bg-slate-900/80 px-2 py-1 rounded text-xs text-white">
+                      {item.play_status.replace('_', ' ').toUpperCase()}
+                      {item.rating && (
+                        <span className="ml-2">★ {item.rating}</span>
+                      )}
+                    </div>
                   </div>
                 ))
               ) : (
@@ -531,6 +660,7 @@ function GameHub() {
           game={selectedGame}
           onClose={() => setSelectedGame(null)}
           onAddToCollection={addToCollection}
+          isRAWG={selectedGame.isRAWG}
         />
       )}
     </div>
@@ -543,7 +673,10 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="flex flex-col items-center gap-3">
+          <Loader className="w-8 h-8 text-white animate-spin" />
+          <div className="text-white text-xl">Loading...</div>
+        </div>
       </div>
     );
   }
