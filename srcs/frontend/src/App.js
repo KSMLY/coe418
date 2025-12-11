@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, LogOut, Library, Star, Calendar, Gamepad2, Plus, Loader, AlertCircle } from 'lucide-react';
+import { Search, LogOut, Library, Star, Calendar, Gamepad2, Plus, Loader, AlertCircle, MessageSquare, Edit2, Trash2, User, Users, Clock, BarChart3, Award, Play, Square, Check, X, Send } from 'lucide-react';
 
 // API Configuration
 const API_BASE = 'https://localhost/api';
@@ -54,6 +54,18 @@ const api = {
     return this.request(endpoint, { method: 'DELETE' });
   }
 };
+
+// Helper to get username from user_id
+async function getUsername(userId) {
+  try {
+    // Try to get user info - adjust endpoint if needed
+    const user = await api.get(`/users/${userId}/`);
+    return user.username || user.display_name || `User ${userId.slice(0, 8)}`;
+  } catch (err) {
+    // If endpoint doesn't exist, fallback
+    return `User ${userId.slice(0, 8)}`;
+  }
+}
 
 // Auth Context
 const AuthContext = React.createContext(null);
@@ -125,6 +137,83 @@ function ErrorToast({ message, onClose }) {
     </div>
   );
 }
+
+// Star Rating Component
+function StarRating({ rating, onRate, readonly = false }) {
+  const [hover, setHover] = useState(0);
+  
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`w-6 h-6 transition-all ${
+            star <= (hover || rating)
+              ? 'fill-yellow-400 text-yellow-400'
+              : 'text-slate-600'
+          } ${!readonly && 'cursor-pointer hover:scale-110'}`}
+          onMouseEnter={() => !readonly && setHover(star)}
+          onMouseLeave={() => !readonly && setHover(0)}
+          onClick={() => !readonly && onRate && onRate(star)}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Review Card Component
+function ReviewCard({ review, currentUserId, isAdmin, onEdit, onDelete }) {
+  const isOwner = review.user_id === currentUserId;
+  const canDelete = isOwner || isAdmin;
+  const reviewDate = new Date(review.review_date).toLocaleDateString();
+  
+  return (
+    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+            <User className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-white font-semibold">{review.username || `User ${review.user_id.slice(0, 8)}`}</p>
+            <p className="text-slate-400 text-sm">{reviewDate}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <StarRating rating={review.rating} readonly />
+          {(isOwner || canDelete) && (
+            <div className="flex gap-1 ml-2">
+              {isOwner && (
+                <button
+                  onClick={() => onEdit(review)}
+                  className="p-1 hover:bg-slate-600 rounded text-slate-400 hover:text-white"
+                  title="Edit review"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => onDelete(review.review_id)}
+                  className="p-1 hover:bg-slate-600 rounded text-red-400 hover:text-red-300"
+                  title="Delete review"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {review.review_text && (
+        <p className="text-slate-300 leading-relaxed">{review.review_text}</p>
+      )}
+    </div>
+  );
+}
+
 
 // Login/Register Component
 function AuthPage() {
@@ -236,6 +325,240 @@ function AuthPage() {
   );
 }
 
+// Write Review Component
+function WriteReview({ gameId, existingReview, onSave, onCancel }) {
+  const [rating, setRating] = useState(existingReview?.rating || 0);
+  const [reviewText, setReviewText] = useState(existingReview?.review_text || '');
+  const [saving, setSaving] = useState(false);
+  
+  const handleSave = async () => {
+    if (rating === 0) {
+      alert('Please select a rating');
+      return;
+    }
+    
+    setSaving(true);
+    try {
+      await onSave({ rating, review_text: reviewText || null });
+    } catch (err) {
+      alert('Failed to save review: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  
+  return (
+    <div className="bg-slate-700 rounded-lg p-6 border-2 border-purple-600">
+      <h3 className="text-white text-xl font-bold mb-4">
+        {existingReview ? 'Edit Your Review' : 'Write a Review'}
+      </h3>
+      
+      <div className="mb-4">
+        <label className="block text-slate-300 mb-2">Your Rating *</label>
+        <StarRating rating={rating} onRate={setRating} />
+      </div>
+      
+      <div className="mb-4">
+        <label className="block text-slate-300 mb-2">Your Review (Optional)</label>
+        <textarea
+          value={reviewText}
+          onChange={(e) => setReviewText(e.target.value)}
+          placeholder="Share your thoughts about this game..."
+          className="w-full px-4 py-3 bg-slate-600 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-32"
+          maxLength={1000}
+        />
+        <p className="text-slate-400 text-xs mt-1">{reviewText.length}/1000 characters</p>
+      </div>
+      
+      <div className="flex gap-3">
+        <button
+          onClick={handleSave}
+          disabled={saving || rating === 0}
+          className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {saving ? (
+            <>
+              <Loader className="w-4 h-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Review'
+          )}
+        </button>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="flex-1 bg-slate-600 hover:bg-slate-500 text-white py-2 rounded font-semibold"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Game Reviews Component
+function GameReviews({ gameId, currentUserId, isAdmin }) {
+  const [reviews, setReviews] = useState([]);
+  const [myReview, setMyReview] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showWriteReview, setShowWriteReview] = useState(false);
+  const [editingReview, setEditingReview] = useState(null);
+  
+  useEffect(() => {
+    loadReviews();
+  }, [gameId]);
+  
+  const loadReviews = async () => {
+  setLoading(true);
+  try {
+    const data = await api.get(`/reviews/games/${gameId}/`);
+    
+    // Fetch usernames for each review
+    const reviewsWithUsernames = await Promise.all(
+      data.map(async (review) => {
+        const username = await getUsername(review.user_id);
+        return { ...review, username };
+      })
+    );
+    
+    const mine = reviewsWithUsernames.find(r => r.user_id === currentUserId);
+    const others = reviewsWithUsernames.filter(r => r.user_id !== currentUserId);
+    
+    setMyReview(mine);
+    setReviews(others);
+    setShowWriteReview(!mine);
+  } catch (err) {
+    console.error('Failed to load reviews:', err);
+  } finally {
+    setLoading(false);
+  }
+};
+  
+  const handleSaveReview = async (reviewData) => {
+    if (editingReview) {
+      await api.put(`/reviews/${editingReview.review_id}/`, reviewData);
+    } else {
+      await api.post(`/reviews/games/${gameId}/`, reviewData);
+    }
+    
+    setEditingReview(null);
+    setShowWriteReview(false);
+    await loadReviews();
+  };
+  
+  const handleDeleteReview = async (reviewId) => {
+    if (!confirm('Delete this review?')) return;
+    
+    try {
+      await api.delete(`/reviews/${reviewId}/`);
+      await loadReviews();
+    } catch (err) {
+      alert('Failed to delete review: ' + err.message);
+    }
+  };
+  
+  const handleEditMyReview = () => {
+    setEditingReview(myReview);
+    setShowWriteReview(true);
+  };
+  
+  if (loading) {
+    return (
+      <div className="text-center text-slate-400 py-8">
+        <Loader className="w-6 h-6 animate-spin mx-auto mb-2" />
+        Loading reviews...
+      </div>
+    );
+  }
+  
+  const totalReviews = reviews.length + (myReview ? 1 : 0);
+  const averageRating = totalReviews > 0
+    ? (reviews.reduce((sum, r) => sum + r.rating, myReview ? myReview.rating : 0) / totalReviews).toFixed(1)
+    : 0;
+  
+  return (
+    <div className="space-y-6">
+      <div className="bg-slate-700 rounded-lg p-6 border border-slate-600">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-white text-xl font-bold mb-2 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Reviews
+            </h3>
+            <p className="text-slate-400">
+              {totalReviews} review{totalReviews !== 1 ? 's' : ''}
+            </p>
+          </div>
+          {averageRating > 0 && (
+            <div className="text-center">
+              <div className="text-4xl font-bold text-white mb-1">{averageRating}</div>
+              <StarRating rating={Math.round(parseFloat(averageRating))} readonly />
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {myReview && !showWriteReview ? (
+        <div>
+          <h4 className="text-white font-semibold mb-3">Your Review</h4>
+          <ReviewCard
+            review={myReview}
+            currentUserId={currentUserId}
+            isAdmin={isAdmin}
+            onEdit={handleEditMyReview}
+            onDelete={handleDeleteReview}
+          />
+        </div>
+      ) : showWriteReview ? (
+        <WriteReview
+          gameId={gameId}
+          existingReview={editingReview}
+          onSave={handleSaveReview}
+          onCancel={editingReview ? () => {
+            setEditingReview(null);
+            setShowWriteReview(false);
+          } : myReview ? null : undefined}
+        />
+      ) : !myReview && (
+        <button
+          onClick={() => setShowWriteReview(true)}
+          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded font-semibold flex items-center justify-center gap-2"
+        >
+          <Edit2 className="w-4 h-4" />
+          Write a Review
+        </button>
+      )}
+      
+      {reviews.length > 0 && (
+        <div>
+          <h4 className="text-white font-semibold mb-3">
+            Other Reviews ({reviews.length})
+          </h4>
+          <div className="space-y-3">
+            {reviews.map((review) => (
+              <ReviewCard
+                key={review.review_id}
+                review={review}
+                currentUserId={currentUserId}
+                isAdmin={isAdmin}
+                onEdit={() => {}}
+                onDelete={handleDeleteReview}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {totalReviews === 0 && !showWriteReview && (
+        <div className="text-center text-slate-400 py-8">
+          No reviews yet. Be the first to review!
+        </div>
+      )}
+    </div>
+  );
+}
 // Game Card Component
 function GameCard({ game, onSelect, isRAWG = false }) {
   return (
@@ -396,7 +719,7 @@ function CollectionEditModal({ item, onClose, onUpdate }) {
 }
 
 // Game Details Modal
-function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false }) {
+function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false, user }) {
   const [loading, setLoading] = useState(false);
   const [playStatus, setPlayStatus] = useState('NOT_STARTED');
   const [rating, setRating] = useState(null);
@@ -485,6 +808,21 @@ function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false }) 
               </div>
             </div>
           )}
+
+
+		  {!isRAWG && game.game_id && (
+			<div className="mb-6">
+			<h3 className="text-white text-xl font-bold mb-4 flex items-center gap-2">
+			<MessageSquare className="w-5 h-5" />
+			Community Reviews
+			</h3>
+			<GameReviews 
+			gameId={game.game_id} 
+			currentUserId={user?.user_id}
+			isAdmin={user?.role === 'admin'}
+				/>
+			</div>
+		)}
 
           {isRAWG && (
             <div className="mb-4 bg-blue-500/20 border border-blue-500 text-blue-200 px-4 py-2 rounded">
@@ -822,11 +1160,12 @@ function GameHub() {
 
       {selectedGame && (
         <GameDetailsModal
-          game={selectedGame}
-          onClose={() => setSelectedGame(null)}
-          onAddToCollection={addToCollection}
-          isRAWG={selectedGame.isRAWG}
-        />
+			game={selectedGame}
+			onClose={() => setSelectedGame(null)}
+			onAddToCollection={addToCollection}
+			isRAWG={selectedGame.isRAWG}
+			user={user}
+		/>
       )}
 
       {editingItem && (
