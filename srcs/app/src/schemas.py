@@ -29,6 +29,7 @@ class UserOut(BaseModel):
     
     class Config:
         from_attributes = True
+        use_enum_values = True  # This returns the enum value instead of the enum object
 
 # GET /users/{user_id} (Output for public viewing)
 class UserPublicOut(BaseModel):
@@ -41,6 +42,7 @@ class UserPublicOut(BaseModel):
     
     class Config:
         from_attributes = True
+        use_enum_values = True
 
 # PUT /profile/ (Input)
 class UserUpdate(BaseModel):
@@ -92,10 +94,16 @@ class UserGameAdd(BaseModel):
     play_status: Optional[PlayStatus] = PlayStatus.NOT_STARTED
     personal_notes: Optional[str] = None
     rating: Optional[int] = Field(None, ge=1, le=5)
+    
+    class Config:
+        use_enum_values = True
 
 # PUT /collection/{game_id}/status/ (Input)
 class UserGameStatusUpdate(BaseModel):
     play_status: PlayStatus
+    
+    class Config:
+        use_enum_values = True
 
 # PUT /collection/{game_id}/rating/ (Input)
 class UserGameRatingUpdate(BaseModel):
@@ -120,6 +128,7 @@ class UserGameOut(BaseModel):
     
     class Config:
         from_attributes = True
+        use_enum_values = True
 
 # ============= ACHIEVEMENT SCHEMAS =============
 
@@ -130,6 +139,9 @@ class AchievementCreate(BaseModel):
     icon_url: Optional[str] = None
     rarity: Optional[Rarity] = None
     points_value: int = Field(default=0, ge=0)
+    
+    class Config:
+        use_enum_values = True
 
 # Base Achievement Definition (Output for GET /collection/{game_id}/achievements/)
 class AchievementOut(BaseModel):
@@ -142,6 +154,7 @@ class AchievementOut(BaseModel):
     
     class Config:
         from_attributes = True
+        use_enum_values = True
 
 # Combined User Achievement Data (Output for GET /collection/{game_id}/achievements/)
 class UserAchievementOut(AchievementOut):
@@ -187,6 +200,7 @@ class FriendRequestOut(BaseModel):
     
     class Config:
         from_attributes = True
+        use_enum_values = True
 
 # ============= PLAY SESSION SCHEMAS =============
         

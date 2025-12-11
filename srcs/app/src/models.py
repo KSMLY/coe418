@@ -8,25 +8,25 @@ import enum
 Base = declarative_base()
 
 class PlayStatus(enum.Enum):
-    NOT_STARTED = "not_started"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    DROPPED = "dropped"
+    NOT_STARTED = "NOT_STARTED"  # Changed from "not_started"
+    IN_PROGRESS = "IN_PROGRESS"  # Changed from "in_progress"
+    COMPLETED = "COMPLETED"      # Changed from "completed"
+    DROPPED = "DROPPED"          # Changed from "dropped"
 
 class Rarity(enum.Enum):
-    COMMON = "common"
-    UNCOMMON = "uncommon"
-    RARE = "rare"
-    EPIC = "epic"
-    LEGENDARY = "legendary"
+    COMMON = "COMMON"           # Changed from "common"
+    UNCOMMON = "UNCOMMON"       # Changed from "uncommon"
+    RARE = "RARE"               # Changed from "rare"
+    EPIC = "EPIC"               # Changed from "epic"
+    LEGENDARY = "LEGENDARY"     # Changed from "legendary"
 
 class FriendshipStatus(enum.Enum):
-    PENDING = "pending"
-    ACCEPTED = "accepted"
+    PENDING = "PENDING"         # Changed from "pending"
+    ACCEPTED = "ACCEPTED"       # Changed from "accepted"
 
 class Role(enum.Enum):
-    USER = 'user'
-    ADMIN = 'admin'
+    USER = 'USER'               # Changed from 'user'
+    ADMIN = 'ADMIN'             # Changed from 'admin'
 
 class User(Base):
     __tablename__ = "USER"

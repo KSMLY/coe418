@@ -266,10 +266,139 @@ function GameCard({ game, onSelect, isRAWG = false }) {
   );
 }
 
+// Collection Item Edit Modal
+function CollectionEditModal({ item, onClose, onUpdate }) {
+  const [playStatus, setPlayStatus] = useState(item.play_status);
+  const [rating, setRating] = useState(item.rating);
+  const [notes, setNotes] = useState(item.personal_notes || '');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      // Update status
+      await api.put(`/collection/${item.game_id}/status/`, { play_status: playStatus });
+      
+      // Update rating if set
+      if (rating !== null) {
+        await api.put(`/collection/${item.game_id}/rating/`, { rating });
+      }
+      
+      // Update notes
+      await api.put(`/collection/${item.game_id}/notes/`, { personal_notes: notes });
+      
+      await onUpdate();
+      onClose();
+    } catch (err) {
+      console.error('Error updating collection item:', err);
+      setError(err.message || 'Failed to update');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div className="bg-slate-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        {item.cover_image_url && (
+          <img src={item.cover_image_url} alt={item.title} className="w-full h-64 object-cover" />
+        )}
+        
+        <div className="p-6">
+          <h2 className="text-3xl font-bold text-white mb-2">{item.title}</h2>
+          <p className="text-slate-400 mb-6">{item.developer}</p>
+
+          {error && (
+            <div className="mb-4 bg-red-500/20 border border-red-500 text-red-200 px-4 py-2 rounded flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          <div className="mb-4">
+            <label className="block text-slate-400 mb-2">Status:</label>
+            <select
+              value={playStatus}
+              onChange={(e) => setPlayStatus(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-700 text-white rounded"
+            >
+              <option value="NOT_STARTED">Not Started</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="DROPPED">Dropped</option>
+            </select>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-slate-400 mb-2">Rating:</label>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-8 h-8 cursor-pointer transition-transform hover:scale-110 ${
+                    star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600'
+                  }`}
+                  onClick={() => setRating(star === rating ? null : star)}
+                />
+              ))}
+              {rating !== null && (
+                <button
+                  onClick={() => setRating(null)}
+                  className="ml-2 text-slate-400 hover:text-white text-sm"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-slate-400 mb-2">Personal Notes:</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add your thoughts about this game..."
+              className="w-full px-4 py-2 bg-slate-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-24"
+              maxLength={500}
+            />
+            <p className="text-slate-500 text-xs mt-1">{notes.length}/500 characters</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Game Details Modal
 function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false }) {
   const [loading, setLoading] = useState(false);
-  const [playStatus, setPlayStatus] = useState('not_started');
+  const [playStatus, setPlayStatus] = useState('NOT_STARTED');
   const [rating, setRating] = useState(null);
   const [error, setError] = useState('');
 
@@ -380,10 +509,10 @@ function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false }) 
               onChange={(e) => setPlayStatus(e.target.value)}
               className="w-full px-4 py-2 bg-slate-700 text-white rounded"
             >
-              <option value="not_started">Not Started</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              <option value="dropped">Dropped</option>
+              <option value="NOT_STARTED">Not Started</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="DROPPED">Dropped</option>
             </select>
           </div>
 
@@ -439,6 +568,7 @@ function GameHub() {
   const [collection, setCollection] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGame, setSelectedGame] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isRAWGSearch, setIsRAWGSearch] = useState(false);
   const [error, setError] = useState('');
@@ -469,10 +599,11 @@ function GameHub() {
     setLoading(true);
     try {
       const data = await api.get('/collection/');
+      console.log('Collection data:', data);
       setCollection(data);
     } catch (err) {
+      console.error('Failed to load collection:', err);
       setError('Failed to load collection: ' + err.message);
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -629,20 +760,54 @@ function GameHub() {
             ) : (
               collection.length > 0 ? (
                 collection.map((item) => (
-                  <div key={item.game_id} className="relative">
-                    <GameCard game={item} onSelect={() => {}} />
-                    <button
-                      onClick={() => removeFromCollection(item.game_id)}
-                      className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-xl font-bold"
+                  <div key={item.game_id} className="relative group">
+                    <div 
+                      className="bg-slate-800 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105"
+                      onClick={() => setEditingItem(item)}
                     >
-                      ×
-                    </button>
-                    <div className="absolute bottom-2 left-2 right-2 bg-slate-900/80 px-2 py-1 rounded text-xs text-white">
-                      {item.play_status.replace('_', ' ').toUpperCase()}
-                      {item.rating && (
-                        <span className="ml-2">★ {item.rating}</span>
+                      {item.cover_image_url ? (
+                        <img src={item.cover_image_url} alt={item.title} className="w-full h-48 object-cover" />
+                      ) : (
+                        <div className="w-full h-48 bg-slate-700 flex items-center justify-center">
+                          <Gamepad2 className="w-16 h-16 text-slate-600" />
+                        </div>
                       )}
+                      <div className="p-4">
+                        <h3 className="text-white font-semibold text-lg mb-1 truncate">{item.title}</h3>
+                        <p className="text-slate-400 text-sm mb-2">{item.developer || 'Unknown Developer'}</p>
+                        
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded">
+                            {item.play_status ? item.play_status.replace(/_/g, ' ') : 'UNKNOWN'}
+                          </span>
+                          {item.rating && (
+                            <div className="flex items-center gap-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-4 h-4 ${i < item.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600'}`}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {item.personal_notes && (
+                          <p className="text-slate-400 text-xs italic truncate">"{item.personal_notes}"</p>
+                        )}
+                      </div>
                     </div>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFromCollection(item.game_id);
+                      }}
+                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-lg transition-all hover:scale-110 z-10"
+                      title="Remove from collection"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))
               ) : (
@@ -661,6 +826,14 @@ function GameHub() {
           onClose={() => setSelectedGame(null)}
           onAddToCollection={addToCollection}
           isRAWG={selectedGame.isRAWG}
+        />
+      )}
+
+      {editingItem && (
+        <CollectionEditModal
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
+          onUpdate={loadCollection}
         />
       )}
     </div>

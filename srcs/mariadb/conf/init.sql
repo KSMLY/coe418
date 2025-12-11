@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS ACHIEVEMENT (
     game_id VARCHAR(36) NOT NULL,
     achievement_name VARCHAR(100) NOT NULL,
     description TEXT,
-    rarity ENUM('common', 'uncommon', 'rare', 'epic', 'legendary'),
+    rarity ENUM('COMMON', 'UNCOMMON', 'RARE', 'EPIC', 'LEGENDARY'),
     points_value INT DEFAULT 0,
     icon_url TEXT,
     FOREIGN KEY (game_id) REFERENCES GAME(game_id) ON DELETE CASCADE
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS ACHIEVEMENT (
 CREATE TABLE IF NOT EXISTS USER_GAMES (
     user_id VARCHAR(36),
     game_id VARCHAR(36),
-    play_status ENUM('not_started', 'in_progress', 'completed', 'dropped') DEFAULT 'not_started',
+    play_status ENUM('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED', 'DROPPED') DEFAULT 'NOT_STARTED',
     personal_notes TEXT,
     rating INT,
     PRIMARY KEY (user_id, game_id),
@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS FRIENDS (
     user_id_initiator VARCHAR(36) NOT NULL,
     user_id_recipient VARCHAR(36) NOT NULL,
     friendship_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    friendship_status ENUM('pending', 'accepted') DEFAULT 'pending',
+    friendship_status ENUM('PENDING', 'ACCEPTED') DEFAULT 'PENDING',
     UNIQUE (user_id_initiator, user_id_recipient),
     FOREIGN KEY (user_id_initiator) REFERENCES USER(user_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id_recipient) REFERENCES USER(user_id) ON DELETE CASCADE
