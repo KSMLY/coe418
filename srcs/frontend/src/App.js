@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, LogOut, Library, Star, Calendar, Gamepad2, Plus, Loader, AlertCircle, MessageSquare, Edit2, Trash2, User, Users, Clock, BarChart3, Award, Play, Square, Check, X, Send } from 'lucide-react';
+import { Search, LogOut, Library, Star, Calendar, Gamepad2, Plus, Loader, AlertCircle, MessageSquare, Edit2, Trash2, User, Users, Clock, BarChart3, Award, Play, Square, Check, X, Send, ArrowLeft, Upload} from 'lucide-react';
 
 // API Configuration
 const API_BASE = 'https://localhost/api';
@@ -162,23 +162,31 @@ function StarRating({ rating, onRate, readonly = false }) {
 }
 
 // Review Card Component
-function ReviewCard({ review, currentUserId, isAdmin, onEdit, onDelete }) {
+function ReviewCard({ review, currentUserId, isAdmin, onEdit, onDelete, onViewProfile }) {
   const isOwner = review.user_id === currentUserId;
   const canDelete = isOwner || isAdmin;
   const reviewDate = new Date(review.review_date).toLocaleDateString();
   
-  // Use display_name if available, fallback to username
   const displayName = review.display_name || review.username || `User ${review.user_id.slice(0, 8)}`;
   
   return (
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+          <div 
+            className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
+            onClick={() => onViewProfile && onViewProfile(review.user_id)}
+            title="View profile"
+          >
             <User className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="text-white font-semibold">{displayName}</p>
+            <p 
+              className="text-white font-semibold cursor-pointer hover:text-purple-300 transition-colors"
+              onClick={() => onViewProfile && onViewProfile(review.user_id)}
+            >
+              {displayName}
+            </p>
             <p className="text-slate-400 text-sm">{reviewDate}</p>
           </div>
         </div>
@@ -216,7 +224,6 @@ function ReviewCard({ review, currentUserId, isAdmin, onEdit, onDelete }) {
     </div>
   );
 }
-
 
 // Login/Register Component
 function AuthPage() {
@@ -329,12 +336,15 @@ function AuthPage() {
 }
 
 //Friend Card component
-function FriendCard({ friend, onRemove, showRemove = true }) {
+function FriendCard({ friend, onRemove, onViewProfile, showRemove = true }) {
   const friendDate = new Date(friend.friendship_date).toLocaleDateString();
   
   return (
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+      <div 
+        className="flex items-center gap-3 flex-1 cursor-pointer hover:bg-slate-600/50 -m-4 p-4 rounded-lg transition-colors"
+        onClick={() => onViewProfile && onViewProfile(friend.friend_user_id)}
+      >
         {friend.friend_profile_picture_url ? (
           <img 
             src={friend.friend_profile_picture_url} 
@@ -347,7 +357,7 @@ function FriendCard({ friend, onRemove, showRemove = true }) {
           </div>
         )}
         <div>
-          <h4 className="text-white font-semibold">
+          <h4 className="text-white font-semibold hover:text-purple-300 transition-colors">
             {friend.friend_display_name || friend.friend_username}
           </h4>
           <p className="text-slate-400 text-sm">@{friend.friend_username}</p>
@@ -357,8 +367,11 @@ function FriendCard({ friend, onRemove, showRemove = true }) {
       
       {showRemove && (
         <button
-          onClick={() => onRemove(friend.friendship_id)}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(friend.friendship_id);
+          }}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2 ml-4"
         >
           <X className="w-4 h-4" />
           Remove
@@ -774,6 +787,9 @@ function FriendsPage({ onFriendsUpdate }) {
                   key={friend.friendship_id}
                   friend={friend}
                   onRemove={removeFriend}
+				  onViewProfile={(userId) => {
+					window.dispatchEvent(new CustomEvent('viewProfile', { detail: userId }));
+				  }}
                 />
               ))
             ) : (
@@ -1027,6 +1043,7 @@ function GameReviews({ gameId, currentUserId, isAdmin }) {
             isAdmin={isAdmin}
             onEdit={handleEditMyReview}
             onDelete={handleDeleteReview}
+			onViewProfile={onViewProfile} 
           />
         </div>
       ) : showWriteReview ? (
@@ -1063,6 +1080,7 @@ function GameReviews({ gameId, currentUserId, isAdmin }) {
                 isAdmin={isAdmin}
                 onEdit={() => {}}
                 onDelete={handleDeleteReview}
+				onViewProfile={onViewProfile}
               />
             ))}
           </div>
@@ -1339,6 +1357,7 @@ function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false, us
 			gameId={game.game_id} 
 			currentUserId={user?.user_id}
 			isAdmin={user?.role === 'admin'}
+			onViewProfile={onViewProfile}
 				/>
 			</div>
 		)}
@@ -1427,7 +1446,7 @@ function ActiveSessionCard({ session, game, onEnd }) {
   const [loading, setLoading] = useState(false);
 
   // Parse the UTC time from backend and convert to local time
-  const startTime = new Date(session.start_time);
+  const startTime = new Date(session.start_time.endsWith('Z') ? session.start_time : session.start_time + 'Z');
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -1544,35 +1563,72 @@ function ActiveSessionCard({ session, game, onEnd }) {
 }
 
 // Session History Card
-function SessionHistoryCard({ session, game }) {
-  const startTime = new Date(session.start_time);
-  const endTime = session.end_time ? new Date(session.end_time) : null;
+function SessionHistoryCard({ session, game, onDelete }) {
+  const [deleting, setDeleting] = useState(false);
+  
+  const startTime = new Date(session.start_time.endsWith('Z') ? session.start_time : session.start_time + 'Z');
+  const endTime = session.end_time ? new Date(session.end_time.endsWith('Z') ? session.end_time : session.end_time + 'Z') : null;
   
   const duration = endTime ? Math.floor((endTime - startTime) / 1000) : 0;
   const hours = Math.floor(duration / 3600);
   const minutes = Math.floor((duration % 3600) / 60);
 
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this session from history?')) return;
+    
+    setDeleting(true);
+    try {
+      await onDelete(session.session_id);
+    } catch (err) {
+      alert('Failed to delete session: ' + err.message);
+      setDeleting(false);
+    }
+  };
+
+  // Handle missing game data
+  const gameTitle = game?.title || 'Deleted Game';
+  const gameImage = game?.cover_image_url;
+
   return (
-    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600">
+    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 relative">
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          {game?.cover_image_url ? (
-            <img src={game.cover_image_url} alt={game.title} className="w-16 h-16 rounded object-cover" />
+        <div className="flex items-center gap-3 flex-1">
+          {gameImage ? (
+            <img src={gameImage} alt={gameTitle} className="w-16 h-16 rounded object-cover" />
           ) : (
             <div className="w-16 h-16 bg-slate-600 rounded flex items-center justify-center">
               <Gamepad2 className="w-8 h-8 text-slate-400" />
             </div>
           )}
-          <div>
-            <h4 className="text-white font-semibold">{game?.title || 'Unknown Game'}</h4>
+          <div className="flex-1">
+            <h4 className={`font-semibold ${!game ? 'text-slate-400 italic' : 'text-white'}`}>
+              {gameTitle}
+            </h4>
+            {!game && (
+              <p className="text-slate-500 text-xs">Game removed from collection</p>
+            )}
             <p className="text-slate-400 text-sm">
               {startTime.toLocaleDateString()} at {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-white font-bold">{hours}h {minutes}m</p>
-          <p className="text-slate-400 text-xs">Duration</p>
+        <div className="text-right flex items-start gap-2">
+          <div>
+            <p className="text-white font-bold">{hours}h {minutes}m</p>
+            <p className="text-slate-400 text-xs">Duration</p>
+          </div>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="bg-red-600 hover:bg-red-700 text-white p-2 rounded disabled:opacity-50 transition-all"
+            title="Delete session"
+          >
+            {deleting ? (
+              <Loader className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </div>
       
@@ -1684,9 +1740,7 @@ function PlaySessionsPage() {
 
   const endSession = async (sessionId, data) => {
     try {
-      console.log('Ending session:', sessionId, 'with data:', data);
-      const response = await api.put(`/sessions/${sessionId}/end/`, data);
-      console.log('End session response:', response);
+      await api.put(`/sessions/${sessionId}/end/`, data);
       await loadData();
       setError('Session ended successfully!');
       setTimeout(() => setError(''), 3000);
@@ -1696,9 +1750,27 @@ function PlaySessionsPage() {
     }
   };
 
-  // Get game data for sessions
+  // NEW: Delete session handler
+  const deleteSession = async (sessionId) => {
+    try {
+      await api.delete(`/sessions/${sessionId}/`);
+      setError('Session deleted');
+      setTimeout(() => setError(''), 2000);
+      
+      // Reload based on current tab
+      if (activeTab === 'history') {
+        await loadHistory();
+      } else {
+        await loadData();
+      }
+    } catch (err) {
+      setError('Failed to delete session: ' + err.message);
+    }
+  };
+
+  // Get game data for sessions (returns null if not found)
   const getGameForSession = (gameId) => {
-    return collectionGames.find(g => g.game_id === gameId);
+    return collectionGames.find(g => g.game_id === gameId) || null;
   };
 
   useEffect(() => {
@@ -1710,7 +1782,11 @@ function PlaySessionsPage() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded flex items-center justify-between">
+        <div className={`${
+          error.includes('success') || error.includes('deleted') 
+            ? 'bg-green-500/20 border-green-500 text-green-200' 
+            : 'bg-red-500/20 border-red-500 text-red-200'
+        } border px-4 py-3 rounded flex items-center justify-between`}>
           <div className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
             <span>{error}</span>
@@ -1816,6 +1892,7 @@ function PlaySessionsPage() {
                   key={session.session_id}
                   session={session}
                   game={getGameForSession(session.game_id)}
+                  onDelete={deleteSession}
                 />
               ))
             ) : (
@@ -1876,6 +1953,505 @@ function PlaySessionsPage() {
   );
 }
 
+// Profile Picture Upload Component
+function ProfilePictureUpload({ currentPictureUrl, onUploadSuccess }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const fileInputRef = React.useRef(null);
+
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please select a valid image (JPG, PNG, GIF, or WEBP)');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be less than 5MB');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/uploads/profile-picture/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      onUploadSuccess(data.url);
+    } catch (err) {
+      setError('Failed to upload: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete your profile picture?')) return;
+
+    setUploading(true);
+    try {
+      await api.delete('/uploads/profile-picture/');
+      onUploadSuccess(null);
+    } catch (err) {
+      setError('Failed to delete: ' + err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative">
+        {currentPictureUrl ? (
+          <img
+            src={currentPictureUrl}
+            alt="Profile"
+            className="w-32 h-32 rounded-full object-cover border-4 border-purple-600"
+          />
+        ) : (
+          <div className="w-32 h-32 rounded-full bg-purple-600 flex items-center justify-center border-4 border-purple-700">
+            <User className="w-16 h-16 text-white" />
+          </div>
+        )}
+        {uploading && (
+          <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+            <Loader className="w-8 h-8 text-white animate-spin" />
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <p className="text-red-400 text-sm">{error}</p>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2 disabled:opacity-50"
+        >
+          <Upload className="w-4 h-4" />
+          {currentPictureUrl ? 'Change Photo' : 'Upload Photo'}
+        </button>
+        {currentPictureUrl && (
+          <button
+            onClick={handleDelete}
+            disabled={uploading}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2 disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// User Stats Card Component
+function UserStatsCard({ stats }) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="bg-slate-700 rounded-lg p-4 text-center">
+        <Library className="w-8 h-8 text-purple-400 mx-auto mb-2" />
+        <p className="text-2xl font-bold text-white">{stats.gamesCount}</p>
+        <p className="text-slate-400 text-sm">Games</p>
+      </div>
+      <div className="bg-slate-700 rounded-lg p-4 text-center">
+        <Clock className="w-8 h-8 text-green-400 mx-auto mb-2" />
+        <p className="text-2xl font-bold text-white">{stats.totalHours}h</p>
+        <p className="text-slate-400 text-sm">Played</p>
+      </div>
+      <div className="bg-slate-700 rounded-lg p-4 text-center">
+        <MessageSquare className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+        <p className="text-2xl font-bold text-white">{stats.reviewsCount}</p>
+        <p className="text-slate-400 text-sm">Reviews</p>
+      </div>
+      <div className="bg-slate-700 rounded-lg p-4 text-center">
+        <Users className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+        <p className="text-2xl font-bold text-white">{stats.friendsCount}</p>
+        <p className="text-slate-400 text-sm">Friends</p>
+      </div>
+    </div>
+  );
+}
+
+// Profile Page Component
+function ProfilePage({ userId, isOwnProfile, onClose }) {
+  const { user: currentUser } = React.useContext(AuthContext);
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({
+    gamesCount: 0,
+    totalHours: 0,
+    reviewsCount: 0,
+    friendsCount: 0
+  });
+  const [games, setGames] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [activeTab, setActiveTab] = useState('games');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ email: '', display_name: '' });
+  const [friendshipStatus, setFriendshipStatus] = useState(null);
+
+  useEffect(() => {
+    loadProfile();
+  }, [userId]);
+
+  const loadProfile = async () => {
+    setLoading(true);
+    try {
+      // Load user profile
+      const profileData = isOwnProfile
+        ? await api.get('/users/profile/')
+        : await api.get(`/users/${userId}`);
+      
+      setProfile(profileData);
+      setEditData({
+        email: profileData.email || '',
+        display_name: profileData.display_name || ''
+      });
+
+      // Load stats and data
+      const [gamesData, reviewsData, friendsData, playtimeData] = await Promise.all([
+        isOwnProfile 
+          ? api.get('/collection/')
+          : api.get(`/collection/`).catch(() => []), // Public collection endpoint needed
+        api.get(`/reviews/users/${profileData.user_id}/`).catch(() => []),
+        isOwnProfile
+          ? api.get('/friends/details/')
+          : Promise.resolve({ count: 0 }), // Can't see other's friends list
+        isOwnProfile
+          ? api.get('/sessions/stats/playtime/').catch(() => ({ total_playtime_hours: 0 }))
+          : Promise.resolve({ total_playtime_hours: 0 })
+      ]);
+
+      setGames(gamesData);
+      setReviews(reviewsData);
+      setStats({
+        gamesCount: Array.isArray(gamesData) ? gamesData.length : 0,
+        totalHours: playtimeData.total_playtime_hours || 0,
+        reviewsCount: Array.isArray(reviewsData) ? reviewsData.length : 0,
+        friendsCount: friendsData.count || 0
+      });
+
+      // Check friendship status if viewing another user
+      if (!isOwnProfile) {
+        const friendStatus = await api.get(`/friends/check/${userId}/`);
+        setFriendshipStatus(friendStatus);
+      }
+    } catch (err) {
+      setError('Failed to load profile: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProfilePictureUpdate = async (newUrl) => {
+    setProfile({ ...profile, profile_picture_url: newUrl });
+    // Optionally reload entire profile to ensure consistency
+    await loadProfile();
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      await api.put('/users/profile/', editData);
+      setIsEditing(false);
+      await loadProfile();
+    } catch (err) {
+      setError('Failed to update profile: ' + err.message);
+    }
+  };
+
+  const handleAddFriend = async () => {
+    try {
+      await api.post(`/friends/${userId}/request/`);
+      await loadProfile();
+    } catch (err) {
+      setError('Failed to send friend request: ' + err.message);
+    }
+  };
+
+  const handleRemoveFriend = async () => {
+    if (!window.confirm('Remove friend?')) return;
+    try {
+      await api.delete(`/friends/${friendshipStatus.friendship_id}/`);
+      await loadProfile();
+    } catch (err) {
+      setError('Failed to remove friend: ' + err.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader className="w-8 h-8 text-white animate-spin" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white">User not found</div>
+      </div>
+    );
+  }
+
+  const displayName = profile.display_name || profile.username;
+
+  return (
+    <div className="min-h-screen bg-slate-900 pb-12">
+      {/* Header */}
+      <div className="bg-gradient-to-b from-purple-900 to-slate-900 pt-6 pb-24">
+        <div className="max-w-4xl mx-auto px-6">
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-white mb-4 flex items-center gap-2 hover:text-purple-300"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
+          )}
+          
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            {isOwnProfile ? (
+              <ProfilePictureUpload
+                currentPictureUrl={profile.profile_picture_url}
+                onUploadSuccess={handleProfilePictureUpdate}
+              />
+            ) : profile.profile_picture_url ? (
+              <img
+                src={profile.profile_picture_url}
+                alt={displayName}
+                className="w-32 h-32 rounded-full object-cover border-4 border-purple-600"
+              />
+            ) : (
+              <div className="w-32 h-32 rounded-full bg-purple-600 flex items-center justify-center border-4 border-purple-700">
+                <User className="w-16 h-16 text-white" />
+              </div>
+            )}
+
+            <div className="flex-1 text-center md:text-left">
+              {isEditing ? (
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={editData.display_name}
+                    onChange={(e) => setEditData({ ...editData, display_name: e.target.value })}
+                    placeholder="Display Name"
+                    className="w-full px-4 py-2 bg-slate-800 text-white rounded"
+                  />
+                  <input
+                    type="email"
+                    value={editData.email}
+                    onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                    placeholder="Email"
+                    className="w-full px-4 py-2 bg-slate-800 text-white rounded"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveProfile}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h1 className="text-3xl font-bold text-white mb-1">{displayName}</h1>
+                  <p className="text-purple-300 mb-2">@{profile.username}</p>
+                  {profile.role === 'ADMIN' && (
+                    <span className="bg-purple-600 text-white px-3 py-1 rounded text-sm">
+                      ADMIN
+                    </span>
+                  )}
+                  <p className="text-slate-400 text-sm mt-2">
+                    Joined {new Date(profile.join_date).toLocaleDateString()}
+                  </p>
+                  
+                  {isOwnProfile && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="mt-3 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded flex items-center gap-2 mx-auto md:mx-0"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit Profile
+                    </button>
+                  )}
+
+                  {!isOwnProfile && friendshipStatus && (
+                    <div className="mt-3">
+                      {friendshipStatus.are_friends ? (
+                        <button
+                          onClick={handleRemoveFriend}
+                          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2 mx-auto md:mx-0"
+                        >
+                          <X className="w-4 h-4" />
+                          Remove Friend
+                        </button>
+                      ) : friendshipStatus.status === 'PENDING' ? (
+                        <div className="bg-yellow-600/20 border border-yellow-600 text-yellow-200 px-4 py-2 rounded">
+                          Friend Request Pending
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleAddFriend}
+                          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded flex items-center gap-2 mx-auto md:mx-0"
+                        >
+                          <Users className="w-4 h-4" />
+                          Add Friend
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="max-w-4xl mx-auto px-6 -mt-16 mb-8">
+        <UserStatsCard stats={stats} />
+      </div>
+
+      {error && (
+        <div className="max-w-4xl mx-auto px-6 mb-4">
+          <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => setError('')} className="text-xl font-bold">×</button>
+          </div>
+        </div>
+      )}
+
+      {/* Content Tabs */}
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="flex gap-2 mb-6 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('games')}
+            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+              activeTab === 'games' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+            }`}
+          >
+            <Library className="w-4 h-4" />
+            Games ({stats.gamesCount})
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+              activeTab === 'reviews' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            Reviews ({stats.reviewsCount})
+          </button>
+        </div>
+
+        {/* Games Grid */}
+        {activeTab === 'games' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {games.length > 0 ? (
+              games.map((game) => (
+                <div key={game.game_id} className="bg-slate-800 rounded-lg overflow-hidden">
+                  {game.cover_image_url ? (
+                    <img src={game.cover_image_url} alt={game.title} className="w-full h-40 object-cover" />
+                  ) : (
+                    <div className="w-full h-40 bg-slate-700 flex items-center justify-center">
+                      <Gamepad2 className="w-12 h-12 text-slate-600" />
+                    </div>
+                  )}
+                  <div className="p-3">
+                    <h4 className="text-white font-semibold text-sm truncate">{game.title}</h4>
+                    {game.rating && (
+                      <div className="flex items-center gap-1 mt-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3 h-3 ${i < game.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600'}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center text-slate-400 py-12">
+                <Library className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>{isOwnProfile ? 'No games in collection yet' : 'No games to display'}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Reviews List */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-3">
+            {reviews.length > 0 ? (
+              reviews.map((review) => (
+                <ReviewCard
+                  key={review.review_id}
+                  review={review}
+                  currentUserId={currentUser?.user_id}
+                  isAdmin={currentUser?.role === 'ADMIN'}
+                  onEdit={() => {}}
+                  onDelete={async () => {
+                    await api.delete(`/reviews/${review.review_id}/`);
+                    loadProfile();
+                  }}
+                />
+              ))
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <MessageSquare className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>{isOwnProfile ? 'No reviews written yet' : 'No reviews to display'}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // Main App Component
 function GameHub() {
   const { user, logout } = React.useContext(AuthContext);
@@ -1889,11 +2465,13 @@ function GameHub() {
   const [loading, setLoading] = useState(false);
   const [isRAWGSearch, setIsRAWGSearch] = useState(false);
   const [error, setError] = useState('');
-
+  const [viewingProfile, setViewingProfile] = useState(null); // null, 'own', or userId
   // Load initial counts when component mounts
   useEffect(() => {
     loadInitialCounts();
   }, []);
+
+
 
   useEffect(() => {
     if (activeTab === 'discover') {
@@ -1985,206 +2563,254 @@ function GameHub() {
         game.title.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : games;
+	
+	
+	 useEffect(() => {
+  const handleViewProfile = (e) => {
+    setViewingProfile(e.detail);
+  };
+  
+  window.addEventListener('viewProfile', handleViewProfile);
+  return () => window.removeEventListener('viewProfile', handleViewProfile);
+}, []);
 
-  return (
+   return (
     <div className="min-h-screen bg-slate-900">
       {error && <ErrorToast message={error} onClose={() => setError('')} />}
       
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Gamepad2 className="w-8 h-8 text-purple-400" />
-            <h1 className="text-2xl font-bold text-white">GameHub</h1>
-          </div>
+      {viewingProfile ? (
+        // PROFILE VIEW MODE
+        <>
+          <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Gamepad2 className="w-8 h-8 text-purple-400" />
+                <h1 className="text-2xl font-bold text-white">GameHub</h1>
+              </div>
+              <button
+                onClick={() => setViewingProfile(null)}
+                className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to App
+              </button>
+            </div>
+          </header>
           
-          <div className="flex items-center gap-4">
-            <span className="text-slate-300">{user?.display_name || user?.username}</span>
-            {user?.role === 'ADMIN' && (
-              <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs">ADMIN</span>
-            )}
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+          <ProfilePage
+            userId={viewingProfile === 'own' ? user.user_id : viewingProfile}
+            isOwnProfile={viewingProfile === 'own'}
+            onClose={() => setViewingProfile(null)}
+          />
+        </>
+      ) : (
+        // NORMAL APP VIEW MODE
+        <>
+          <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Gamepad2 className="w-8 h-8 text-purple-400" />
+                <h1 className="text-2xl font-bold text-white">GameHub</h1>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <span className="text-slate-300">{user?.display_name || user?.username}</span>
+                {user?.role === 'ADMIN' && (
+                  <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs">ADMIN</span>
+                )}
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
+          </header>
 
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Tabs */}
-        <div className="flex gap-4 mb-6 overflow-x-auto">
-          <button
-            onClick={() => {
-              setActiveTab('discover');
-              setSearchQuery('');
-              setIsRAWGSearch(false);
-            }}
-            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
-              activeTab === 'discover' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            <Search className="w-4 h-4" />
-            Discover
-          </button>
-          <button
-            onClick={() => setActiveTab('collection')}
-            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
-              activeTab === 'collection' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            <Library className="w-4 h-4" />
-            My Collection ({collection.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('sessions')}
-            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
-              activeTab === 'sessions' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            Sessions
-          </button>
-          <button
-            onClick={() => setActiveTab('friends')}
-            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
-              activeTab === 'friends' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Friends ({friendsCount})
-          </button>
-        </div>
+          <div className="max-w-7xl mx-auto p-6">
+            {/* Tabs */}
+            <div className="flex gap-4 mb-6 overflow-x-auto">
+              <button
+                onClick={() => {
+                  setActiveTab('discover');
+                  setSearchQuery('');
+                  setIsRAWGSearch(false);
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+                  activeTab === 'discover' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                <Search className="w-4 h-4" />
+                Discover
+              </button>
+              <button
+                onClick={() => setActiveTab('collection')}
+                className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+                  activeTab === 'collection' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                <Library className="w-4 h-4" />
+                My Collection ({collection.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('sessions')}
+                className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+                  activeTab === 'sessions' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                Sessions
+              </button>
+              <button
+                onClick={() => setActiveTab('friends')}
+                className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+                  activeTab === 'friends' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Friends ({friendsCount})
+              </button>
+              <button
+                onClick={() => setViewingProfile('own')}
+                className="flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700"
+              >
+                <User className="w-4 h-4" />
+                Profile
+              </button>
+            </div>
 
-        {/* Tab Content */}
-        {activeTab === 'friends' ? (
-          <FriendsPage onFriendsUpdate={(count) => setFriendsCount(count)} />
-        ) : activeTab === 'sessions' ? (
-          <PlaySessionsPage />
-        ) : (
-          <>
-            {activeTab === 'discover' && (
-              <div className="mb-6">
-                <div className="flex gap-3 mb-3">
-                  <input
-                    type="text"
-                    placeholder="Search games..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && searchRAWG()}
-                    className="flex-1 px-4 py-2 bg-slate-800 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <button
-                    onClick={searchRAWG}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-semibold flex items-center gap-2"
-                  >
-                    <Search className="w-4 h-4" />
-                    Search RAWG
-                  </button>
-                  <button
-                    onClick={loadGames}
-                    className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded font-semibold"
-                  >
-                    Browse Database
-                  </button>
-                </div>
-                {isRAWGSearch && (
-                  <div className="bg-purple-600/20 border border-purple-600 text-purple-200 px-4 py-2 rounded">
-                    Searching RAWG database. Games will be imported when added to collection.
+            {/* Tab Content */}
+            {activeTab === 'friends' ? (
+              <FriendsPage onFriendsUpdate={(count) => setFriendsCount(count)} />
+            ) : activeTab === 'sessions' ? (
+              <PlaySessionsPage />
+            ) : (
+              <>
+                {activeTab === 'discover' && (
+                  <div className="mb-6">
+                    <div className="flex gap-3 mb-3">
+                      <input
+                        type="text"
+                        placeholder="Search games..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && searchRAWG()}
+                        className="flex-1 px-4 py-2 bg-slate-800 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                      <button
+                        onClick={searchRAWG}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-semibold flex items-center gap-2"
+                      >
+                        <Search className="w-4 h-4" />
+                        Search RAWG
+                      </button>
+                      <button
+                        onClick={loadGames}
+                        className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded font-semibold"
+                      >
+                        Browse Database
+                      </button>
+                    </div>
+                    {isRAWGSearch && (
+                      <div className="bg-purple-600/20 border border-purple-600 text-purple-200 px-4 py-2 rounded">
+                        Searching RAWG database. Games will be imported when added to collection.
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )}
 
-            {loading ? (
-              <div className="text-center text-slate-400 py-12 flex flex-col items-center gap-3">
-                <Loader className="w-8 h-8 animate-spin" />
-                <p>Loading...</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {activeTab === 'discover' ? (
-                  filteredGames.length > 0 ? (
-                    filteredGames.map((game) => (
-                      <GameCard 
-                        key={game.game_id || game.external_api_id} 
-                        game={game} 
-                        onSelect={handleGameSelect}
-                        isRAWG={isRAWGSearch}
-                      />
-                    ))
-                  ) : (
-                    <div className="col-span-full text-center text-slate-400 py-12">
-                      No games found. Try searching!
-                    </div>
-                  )
+                {loading ? (
+                  <div className="text-center text-slate-400 py-12 flex flex-col items-center gap-3">
+                    <Loader className="w-8 h-8 animate-spin" />
+                    <p>Loading...</p>
+                  </div>
                 ) : (
-                  collection.length > 0 ? (
-                    collection.map((item) => (
-                      <div key={item.game_id} className="relative group">
-                        <div 
-                          className="bg-slate-800 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105"
-                          onClick={() => setEditingItem(item)}
-                        >
-                          {item.cover_image_url ? (
-                            <img src={item.cover_image_url} alt={item.title} className="w-full h-48 object-cover" />
-                          ) : (
-                            <div className="w-full h-48 bg-slate-700 flex items-center justify-center">
-                              <Gamepad2 className="w-16 h-16 text-slate-600" />
-                            </div>
-                          )}
-                          <div className="p-4">
-                            <h3 className="text-white font-semibold text-lg mb-1 truncate">{item.title}</h3>
-                            <p className="text-slate-400 text-sm mb-2">{item.developer || 'Unknown Developer'}</p>
-                            
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded">
-                                {item.play_status ? item.play_status.replace(/_/g, ' ') : 'UNKNOWN'}
-                              </span>
-                              {item.rating && (
-                                <div className="flex items-center gap-1">
-                                  {[...Array(5)].map((_, i) => (
-                                    <Star
-                                      key={i}
-                                      className={`w-4 h-4 ${i < item.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600'}`}
-                                    />
-                                  ))}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {activeTab === 'discover' ? (
+                      filteredGames.length > 0 ? (
+                        filteredGames.map((game) => (
+                          <GameCard 
+                            key={game.game_id || game.external_api_id} 
+                            game={game} 
+                            onSelect={handleGameSelect}
+                            isRAWG={isRAWGSearch}
+                          />
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center text-slate-400 py-12">
+                          No games found. Try searching!
+                        </div>
+                      )
+                    ) : (
+                      collection.length > 0 ? (
+                        collection.map((item) => (
+                          <div key={item.game_id} className="relative group">
+                            <div 
+                              className="bg-slate-800 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105"
+                              onClick={() => setEditingItem(item)}
+                            >
+                              {item.cover_image_url ? (
+                                <img src={item.cover_image_url} alt={item.title} className="w-full h-48 object-cover" />
+                              ) : (
+                                <div className="w-full h-48 bg-slate-700 flex items-center justify-center">
+                                  <Gamepad2 className="w-16 h-16 text-slate-600" />
                                 </div>
                               )}
+                              <div className="p-4">
+                                <h3 className="text-white font-semibold text-lg mb-1 truncate">{item.title}</h3>
+                                <p className="text-slate-400 text-sm mb-2">{item.developer || 'Unknown Developer'}</p>
+                                
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded">
+                                    {item.play_status ? item.play_status.replace(/_/g, ' ') : 'UNKNOWN'}
+                                  </span>
+                                  {item.rating && (
+                                    <div className="flex items-center gap-1">
+                                      {[...Array(5)].map((_, i) => (
+                                        <Star
+                                          key={i}
+                                          className={`w-4 h-4 ${i < item.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600'}`}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {item.personal_notes && (
+                                  <p className="text-slate-400 text-xs italic truncate">"{item.personal_notes}"</p>
+                                )}
+                              </div>
                             </div>
                             
-                            {item.personal_notes && (
-                              <p className="text-slate-400 text-xs italic truncate">"{item.personal_notes}"</p>
-                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFromCollection(item.game_id);
+                              }}
+                              className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-lg transition-all hover:scale-110 z-10"
+                              title="Remove from collection"
+                            >
+                              ✕
+                            </button>
                           </div>
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center text-slate-400 py-12">
+                          Your collection is empty. Start adding games!
                         </div>
-                        
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeFromCollection(item.game_id);
-                          }}
-                          className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-lg transition-all hover:scale-110 z-10"
-                          title="Remove from collection"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="col-span-full text-center text-slate-400 py-12">
-                      Your collection is empty. Start adding games!
-                    </div>
-                  )
+                      )
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
 
+      {/* Modals - these are outside the conditional render */}
       {selectedGame && (
         <GameDetailsModal
           game={selectedGame}
@@ -2192,6 +2818,7 @@ function GameHub() {
           onAddToCollection={addToCollection}
           isRAWG={selectedGame.isRAWG}
           user={user}
+          onViewProfile={(userId) => setViewingProfile(userId)}
         />
       )}
 
