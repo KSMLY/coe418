@@ -42,10 +42,23 @@ async def create_review(
     db.commit()
     db.refresh(new_review)
     
-    return new_review
+    # Add username to response
+    user = db.query(User).filter(User.user_id == current_user.user_id).first()
+    review_dict = {
+        "review_id": new_review.review_id,
+        "user_id": new_review.user_id,
+        "game_id": new_review.game_id,
+        "review_text": new_review.review_text,
+        "rating": new_review.rating,
+        "review_date": new_review.review_date,
+        "username": user.username,
+        "display_name": user.display_name
+    }
+    
+    return review_dict
 
 # Get all reviews for a game
-@router.get("/games/{game_id}/", response_model=List[schemas.ReviewOut])
+@router.get("/games/{game_id}/", response_model=List[schemas.ReviewWithUserOut])
 async def get_game_reviews(
     game_id: str,
     skip: int = 0,
@@ -57,58 +70,120 @@ async def get_game_reviews(
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     
-    reviews = db.query(Review).filter(
+    # Join Review with User to get username
+    reviews = db.query(Review, User).join(
+        User, Review.user_id == User.user_id
+    ).filter(
         Review.game_id == game_id
     ).offset(skip).limit(limit).all()
     
-    return reviews
+    # Format response with username
+    result = []
+    for review, user in reviews:
+        review_dict = {
+            "review_id": review.review_id,
+            "user_id": review.user_id,
+            "game_id": review.game_id,
+            "review_text": review.review_text,
+            "rating": review.rating,
+            "review_date": review.review_date,
+            "username": user.username,
+            "display_name": user.display_name
+        }
+        result.append(review_dict)
+    
+    return result
 
 # Get specific review by ID
-@router.get("/{review_id}/", response_model=schemas.ReviewOut)
+@router.get("/{review_id}/", response_model=schemas.ReviewWithUserOut)
 async def get_review(
     review_id: str,
     db: Session = Depends(get_db)
 ):
-    review = db.query(Review).filter(Review.review_id == review_id).first()
+    review_user = db.query(Review, User).join(
+        User, Review.user_id == User.user_id
+    ).filter(Review.review_id == review_id).first()
     
-    if not review:
+    if not review_user:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    return review
+    review, user = review_user
+    review_dict = {
+        "review_id": review.review_id,
+        "user_id": review.user_id,
+        "game_id": review.game_id,
+        "review_text": review.review_text,
+        "rating": review.rating,
+        "review_date": review.review_date,
+        "username": user.username,
+        "display_name": user.display_name
+    }
+    
+    return review_dict
 
 # Get current user's review for a specific game
-@router.get("/games/{game_id}/my-review/", response_model=schemas.ReviewOut)
+@router.get("/games/{game_id}/my-review/", response_model=schemas.ReviewWithUserOut)
 async def get_my_review_for_game(
     game_id: str,
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
-    review = db.query(Review).filter(
+    review_user = db.query(Review, User).join(
+        User, Review.user_id == User.user_id
+    ).filter(
         Review.user_id == current_user.user_id,
         Review.game_id == game_id
     ).first()
     
-    if not review:
+    if not review_user:
         raise HTTPException(status_code=404, detail="You haven't reviewed this game yet")
     
-    return review
+    review, user = review_user
+    review_dict = {
+        "review_id": review.review_id,
+        "user_id": review.user_id,
+        "game_id": review.game_id,
+        "review_text": review.review_text,
+        "rating": review.rating,
+        "review_date": review.review_date,
+        "username": user.username,
+        "display_name": user.display_name
+    }
+    
+    return review_dict
 
 # Get all reviews by current user
-@router.get("/my-reviews/", response_model=List[schemas.ReviewOut])
+@router.get("/my-reviews/", response_model=List[schemas.ReviewWithUserOut])
 async def get_my_reviews(
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_db)
 ):
-    reviews = db.query(Review).filter(
+    reviews = db.query(Review, User).join(
+        User, Review.user_id == User.user_id
+    ).filter(
         Review.user_id == current_user.user_id
     ).offset(skip).limit(limit).all()
     
-    return reviews
+    result = []
+    for review, user in reviews:
+        review_dict = {
+            "review_id": review.review_id,
+            "user_id": review.user_id,
+            "game_id": review.game_id,
+            "review_text": review.review_text,
+            "rating": review.rating,
+            "review_date": review.review_date,
+            "username": user.username,
+            "display_name": user.display_name
+        }
+        result.append(review_dict)
+    
+    return result
 
 # Get all reviews by a specific user (public)
-@router.get("/users/{user_id}/", response_model=List[schemas.ReviewOut])
+@router.get("/users/{user_id}/", response_model=List[schemas.ReviewWithUserOut])
 async def get_user_reviews(
     user_id: str,
     skip: int = 0,
@@ -120,14 +195,30 @@ async def get_user_reviews(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    reviews = db.query(Review).filter(
+    reviews = db.query(Review, User).join(
+        User, Review.user_id == User.user_id
+    ).filter(
         Review.user_id == user_id
     ).offset(skip).limit(limit).all()
     
-    return reviews
+    result = []
+    for review, user in reviews:
+        review_dict = {
+            "review_id": review.review_id,
+            "user_id": review.user_id,
+            "game_id": review.game_id,
+            "review_text": review.review_text,
+            "rating": review.rating,
+            "review_date": review.review_date,
+            "username": user.username,
+            "display_name": user.display_name
+        }
+        result.append(review_dict)
+    
+    return result
 
 # Update own review
-@router.put("/{review_id}/", response_model=schemas.ReviewOut)
+@router.put("/{review_id}/", response_model=schemas.ReviewWithUserOut)
 async def update_review(
     review_id: str,
     review_data: schemas.ReviewUpdate,
@@ -152,7 +243,20 @@ async def update_review(
     db.commit()
     db.refresh(review)
     
-    return review
+    # Add username to response
+    user = db.query(User).filter(User.user_id == current_user.user_id).first()
+    review_dict = {
+        "review_id": review.review_id,
+        "user_id": review.user_id,
+        "game_id": review.game_id,
+        "review_text": review.review_text,
+        "rating": review.rating,
+        "review_date": review.review_date,
+        "username": user.username,
+        "display_name": user.display_name
+    }
+    
+    return review_dict
 
 # Delete review (owner or admin)
 @router.delete("/{review_id}/", status_code=status.HTTP_204_NO_CONTENT)

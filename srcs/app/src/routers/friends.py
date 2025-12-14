@@ -11,22 +11,19 @@ import schemas
 router = APIRouter(prefix="/friends", tags=["Friends"])
 
 # Send friend request
-@router.post("/{user_id}/request/", response_model=schemas.FriendRequestOut, status_code=status.HTTP_201_CREATED)
+@router.post("/{user_id}/request/", status_code=status.HTTP_201_CREATED)
 async def send_friend_request(
     user_id: str,
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
-    # Can't friend yourself
     if user_id == current_user.user_id:
         raise HTTPException(status_code=400, detail="Cannot send friend request to yourself")
     
-    # Verify recipient exists
     recipient = db.query(User).filter(User.user_id == user_id).first()
     if not recipient:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Check if friendship already exists (either direction)
     existing = db.query(Friends).filter(
         or_(
             and_(
@@ -46,7 +43,6 @@ async def send_friend_request(
         else:
             raise HTTPException(status_code=409, detail="Friend request already pending")
     
-    # Create friend request
     friend_request = Friends(
         user_id_initiator=current_user.user_id,
         user_id_recipient=user_id,
@@ -57,10 +53,10 @@ async def send_friend_request(
     db.commit()
     db.refresh(friend_request)
     
-    return friend_request
+    return {"message": "Friend request sent", "friendship_id": friend_request.friendship_id}
 
 # Accept friend request
-@router.put("/{friendship_id}/accept/", response_model=schemas.FriendRequestOut)
+@router.put("/{friendship_id}/accept/")
 async def accept_friend_request(
     friendship_id: str,
     current_user: CurrentUser,
@@ -71,28 +67,24 @@ async def accept_friend_request(
     if not friendship:
         raise HTTPException(status_code=404, detail="Friend request not found")
     
-    # Only recipient can accept
     if friendship.user_id_recipient != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to accept this request")
     
-    # Check if already accepted
     if friendship.friendship_status == FriendshipStatus.ACCEPTED:
         raise HTTPException(status_code=400, detail="Friend request already accepted")
     
-    # Accept the request
     friendship.friendship_status = FriendshipStatus.ACCEPTED
     db.commit()
     db.refresh(friendship)
     
-    return friendship
+    return {"message": "Friend request accepted"}
 
 # Get all friends (accepted friendships)
-@router.get("/", response_model=List[schemas.FriendRequestOut])
+@router.get("/")
 async def get_friends(
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
-    # Get all accepted friendships where user is either initiator or recipient
     friendships = db.query(Friends).filter(
         or_(
             Friends.user_id_initiator == current_user.user_id,
@@ -103,33 +95,67 @@ async def get_friends(
     
     return friendships
 
-# Get pending friend requests (received)
-@router.get("/requests/incoming/", response_model=List[schemas.FriendRequestOut])
+# Get pending friend requests (received) - WITH USER INFO
+@router.get("/requests/incoming/")
 async def get_incoming_requests(
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
     # Get pending requests where current user is recipient
-    requests = db.query(Friends).filter(
+    requests = db.query(Friends, User).join(
+        User, Friends.user_id_initiator == User.user_id
+    ).filter(
         Friends.user_id_recipient == current_user.user_id,
         Friends.friendship_status == FriendshipStatus.PENDING
     ).all()
     
-    return requests
+    # Format response with initiator info
+    result = []
+    for friendship, initiator in requests:
+        request_dict = {
+            "friendship_id": friendship.friendship_id,
+            "user_id_initiator": friendship.user_id_initiator,
+            "user_id_recipient": friendship.user_id_recipient,
+            "friendship_date": friendship.friendship_date,
+            "friendship_status": friendship.friendship_status.value,
+            "initiator_username": initiator.username,
+            "initiator_display_name": initiator.display_name,
+            "initiator_profile_picture_url": initiator.profile_picture_url
+        }
+        result.append(request_dict)
+    
+    return result
 
-# Get pending friend requests (sent)
-@router.get("/requests/outgoing/", response_model=List[schemas.FriendRequestOut])
+# Get pending friend requests (sent) - WITH USER INFO
+@router.get("/requests/outgoing/")
 async def get_outgoing_requests(
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
     # Get pending requests where current user is initiator
-    requests = db.query(Friends).filter(
+    requests = db.query(Friends, User).join(
+        User, Friends.user_id_recipient == User.user_id
+    ).filter(
         Friends.user_id_initiator == current_user.user_id,
         Friends.friendship_status == FriendshipStatus.PENDING
     ).all()
     
-    return requests
+    # Format response with recipient info
+    result = []
+    for friendship, recipient in requests:
+        request_dict = {
+            "friendship_id": friendship.friendship_id,
+            "user_id_initiator": friendship.user_id_initiator,
+            "user_id_recipient": friendship.user_id_recipient,
+            "friendship_date": friendship.friendship_date,
+            "friendship_status": friendship.friendship_status.value,
+            "recipient_username": recipient.username,
+            "recipient_display_name": recipient.display_name,
+            "recipient_profile_picture_url": recipient.profile_picture_url
+        }
+        result.append(request_dict)
+    
+    return result
 
 # Reject/Cancel friend request
 @router.delete("/{friendship_id}/reject/", status_code=status.HTTP_204_NO_CONTENT)
@@ -143,11 +169,9 @@ async def reject_friend_request(
     if not friendship:
         raise HTTPException(status_code=404, detail="Friend request not found")
     
-    # Must be pending to reject
     if friendship.friendship_status != FriendshipStatus.PENDING:
         raise HTTPException(status_code=400, detail="Can only reject pending requests")
     
-    # Only recipient can reject (or initiator can cancel their own request)
     if friendship.user_id_recipient != current_user.user_id and friendship.user_id_initiator != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to reject this request")
     
@@ -168,7 +192,6 @@ async def remove_friend(
     if not friendship:
         raise HTTPException(status_code=404, detail="Friendship not found")
     
-    # Must be part of the friendship (either initiator or recipient) OR admin
     is_involved = (
         friendship.user_id_initiator == current_user.user_id or 
         friendship.user_id_recipient == current_user.user_id
@@ -189,7 +212,6 @@ async def check_friendship(
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
-    # Check friendship status between current user and specified user
     friendship = db.query(Friends).filter(
         or_(
             and_(
@@ -223,7 +245,6 @@ async def get_friends_with_details(
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
-    # Get all accepted friendships
     friendships = db.query(Friends).filter(
         or_(
             Friends.user_id_initiator == current_user.user_id,
@@ -232,10 +253,8 @@ async def get_friends_with_details(
         Friends.friendship_status == FriendshipStatus.ACCEPTED
     ).all()
     
-    # Get friend user details
     friends_list = []
     for friendship in friendships:
-        # Determine which user is the friend (not current user)
         friend_id = (
             friendship.user_id_recipient 
             if friendship.user_id_initiator == current_user.user_id 
@@ -262,12 +281,10 @@ async def get_mutual_friends(
     current_user: CurrentUser,
     db: Session = Depends(get_db)
 ):
-    # Verify other user exists
     other_user = db.query(User).filter(User.user_id == user_id).first()
     if not other_user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Get current user's friends
     current_user_friends = db.query(Friends).filter(
         or_(
             Friends.user_id_initiator == current_user.user_id,
@@ -276,7 +293,6 @@ async def get_mutual_friends(
         Friends.friendship_status == FriendshipStatus.ACCEPTED
     ).all()
     
-    # Extract friend IDs
     current_user_friend_ids = set()
     for friendship in current_user_friends:
         friend_id = (
@@ -286,7 +302,6 @@ async def get_mutual_friends(
         )
         current_user_friend_ids.add(friend_id)
     
-    # Get other user's friends
     other_user_friends = db.query(Friends).filter(
         or_(
             Friends.user_id_initiator == user_id,
@@ -295,7 +310,6 @@ async def get_mutual_friends(
         Friends.friendship_status == FriendshipStatus.ACCEPTED
     ).all()
     
-    # Extract friend IDs
     other_user_friend_ids = set()
     for friendship in other_user_friends:
         friend_id = (
@@ -305,10 +319,8 @@ async def get_mutual_friends(
         )
         other_user_friend_ids.add(friend_id)
     
-    # Find mutual friends
     mutual_friend_ids = current_user_friend_ids.intersection(other_user_friend_ids)
     
-    # Get user details for mutual friends
     mutual_friends = []
     for friend_id in mutual_friend_ids:
         friend = db.query(User).filter(User.user_id == friend_id).first()

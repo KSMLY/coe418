@@ -167,6 +167,9 @@ function ReviewCard({ review, currentUserId, isAdmin, onEdit, onDelete }) {
   const canDelete = isOwner || isAdmin;
   const reviewDate = new Date(review.review_date).toLocaleDateString();
   
+  // Use display_name if available, fallback to username
+  const displayName = review.display_name || review.username || `User ${review.user_id.slice(0, 8)}`;
+  
   return (
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600">
       <div className="flex items-start justify-between mb-3">
@@ -175,7 +178,7 @@ function ReviewCard({ review, currentUserId, isAdmin, onEdit, onDelete }) {
             <User className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="text-white font-semibold">{review.username || `User ${review.user_id.slice(0, 8)}`}</p>
+            <p className="text-white font-semibold">{displayName}</p>
             <p className="text-slate-400 text-sm">{reviewDate}</p>
           </div>
         </div>
@@ -325,6 +328,528 @@ function AuthPage() {
   );
 }
 
+//Friend Card component
+function FriendCard({ friend, onRemove, showRemove = true }) {
+  const friendDate = new Date(friend.friendship_date).toLocaleDateString();
+  
+  return (
+    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {friend.friend_profile_picture_url ? (
+          <img 
+            src={friend.friend_profile_picture_url} 
+            alt={friend.friend_username}
+            className="w-12 h-12 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+            <User className="w-6 h-6 text-white" />
+          </div>
+        )}
+        <div>
+          <h4 className="text-white font-semibold">
+            {friend.friend_display_name || friend.friend_username}
+          </h4>
+          <p className="text-slate-400 text-sm">@{friend.friend_username}</p>
+          <p className="text-slate-500 text-xs mt-1">Friends since {friendDate}</p>
+        </div>
+      </div>
+      
+      {showRemove && (
+        <button
+          onClick={() => onRemove(friend.friendship_id)}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
+        >
+          <X className="w-4 h-4" />
+          Remove
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Friend Request Card Component
+function FriendRequestCard({ request, onAccept, onReject, type = 'incoming' }) {
+  const [loading, setLoading] = useState(false);
+  
+  const handleAccept = async () => {
+    setLoading(true);
+    try {
+      await onAccept(request.friendship_id);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleReject = async () => {
+    setLoading(true);
+    try {
+      await onReject(request.friendship_id);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Get the correct user info based on request type
+  const userInfo = type === 'incoming' ? {
+    username: request.initiator_username,
+    displayName: request.initiator_display_name,
+    profilePicture: request.initiator_profile_picture_url
+  } : {
+    username: request.recipient_username,
+    displayName: request.recipient_display_name,
+    profilePicture: request.recipient_profile_picture_url
+  };
+  
+  const displayName = userInfo.displayName || userInfo.username || 'Unknown User';
+  
+  return (
+    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {userInfo.profilePicture ? (
+          <img 
+            src={userInfo.profilePicture} 
+            alt={displayName}
+            className="w-12 h-12 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+            <User className="w-6 h-6 text-white" />
+          </div>
+        )}
+        <div>
+          <h4 className="text-white font-semibold">{displayName}</h4>
+          <p className="text-slate-400 text-sm">
+            @{userInfo.username || 'unknown'}
+          </p>
+          <p className="text-slate-500 text-xs mt-1">
+            {type === 'incoming' ? 'Wants to be friends' : 'Request pending'}
+          </p>
+        </div>
+      </div>
+      
+      <div className="flex gap-2">
+        {type === 'incoming' ? (
+          <>
+            <button
+              onClick={handleAccept}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2 disabled:opacity-50"
+            >
+              <Check className="w-4 h-4" />
+              Accept
+            </button>
+            <button
+              onClick={handleReject}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2 disabled:opacity-50"
+            >
+              <X className="w-4 h-4" />
+              Reject
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={handleReject}
+            disabled={loading}
+            className="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-sm flex items-center gap-2 disabled:opacity-50"
+          >
+            <X className="w-4 h-4" />
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// User Search Result Card
+function UserSearchCard({ user, onSendRequest, requestSent }) {
+  const [loading, setLoading] = useState(false);
+  
+  const handleSend = async () => {
+    setLoading(true);
+    try {
+      await onSendRequest(user.user_id);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  return (
+    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {user.profile_picture_url ? (
+          <img 
+            src={user.profile_picture_url} 
+            alt={user.username}
+            className="w-12 h-12 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
+            <User className="w-6 h-6 text-white" />
+          </div>
+        )}
+        <div>
+          <h4 className="text-white font-semibold">
+            {user.display_name || user.username}
+          </h4>
+          <p className="text-slate-400 text-sm">@{user.username}</p>
+          {user.role === 'ADMIN' && (
+            <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs mt-1 inline-block">
+              ADMIN
+            </span>
+          )}
+        </div>
+      </div>
+      
+      <button
+        onClick={handleSend}
+        disabled={loading || requestSent}
+        className={`px-4 py-2 rounded text-sm flex items-center gap-2 disabled:opacity-50 ${
+          requestSent 
+            ? 'bg-slate-600 text-slate-300 cursor-not-allowed' 
+            : 'bg-purple-600 hover:bg-purple-700 text-white'
+        }`}
+      >
+        {loading ? (
+          <Loader className="w-4 h-4 animate-spin" />
+        ) : requestSent ? (
+          <>
+            <Check className="w-4 h-4" />
+            Request Sent
+          </>
+        ) : (
+          <>
+            <Send className="w-4 h-4" />
+            Add Friend
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+
+// Main Friends Component
+function FriendsPage({ onFriendsUpdate }) {
+  const { user } = React.useContext(AuthContext);
+  const [activeTab, setActiveTab] = useState('friends');
+  const [friends, setFriends] = useState([]);
+  const [incomingRequests, setIncomingRequests] = useState([]);
+  const [outgoingRequests, setOutgoingRequests] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [sentRequests, setSentRequests] = useState(new Set());
+
+  // Load ALL data on mount for accurate counts
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  // Load data when switching tabs
+  useEffect(() => {
+    if (activeTab === 'add' && searchQuery.trim()) {
+      const timeoutId = setTimeout(() => {
+        loadAllUsers();
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [activeTab, searchQuery]);
+
+  const loadAllData = async () => {
+    // Load all data in parallel for initial counts
+    try {
+      const [friendsData, incomingData, outgoingData] = await Promise.all([
+        api.get('/friends/details/'),
+        api.get('/friends/requests/incoming/'),
+        api.get('/friends/requests/outgoing/')
+      ]);
+      
+      setFriends(friendsData.friends || []);
+      setIncomingRequests(incomingData);
+      setOutgoingRequests(outgoingData);
+      
+      if (onFriendsUpdate) {
+        onFriendsUpdate(friendsData.count || 0);
+      }
+    } catch (err) {
+      console.error('Failed to load friends data:', err);
+    }
+  };
+
+  const loadFriends = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/friends/details/');
+      setFriends(data.friends || []);
+      if (onFriendsUpdate) {
+        onFriendsUpdate(data.count || 0);
+      }
+    } catch (err) {
+      setError('Failed to load friends: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadIncomingRequests = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/friends/requests/incoming/');
+      setIncomingRequests(data);
+    } catch (err) {
+      setError('Failed to load requests: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOutgoingRequests = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/friends/requests/outgoing/');
+      setOutgoingRequests(data);
+    } catch (err) {
+      setError('Failed to load requests: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAllUsers = async () => {
+    if (!searchQuery.trim()) {
+      setAllUsers([]);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const data = await api.get(`/users/search/?query=${encodeURIComponent(searchQuery)}`);
+      setAllUsers(data);
+    } catch (err) {
+      setError('Failed to search users: ' + err.message);
+      setAllUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendFriendRequest = async (userId) => {
+    try {
+      await api.post(`/friends/${userId}/request/`);
+      setSentRequests(prev => new Set([...prev, userId]));
+      setError('');
+      setTimeout(() => {
+        setError('Friend request sent!');
+        setTimeout(() => setError(''), 2000);
+      }, 100);
+      // Reload outgoing requests to update count
+      loadOutgoingRequests();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const acceptRequest = async (friendshipId) => {
+    try {
+      await api.put(`/friends/${friendshipId}/accept/`);
+      // Reload all data to update counts
+      await loadAllData();
+    } catch (err) {
+      setError('Failed to accept request: ' + err.message);
+    }
+  };
+
+  const rejectRequest = async (friendshipId) => {
+    try {
+      await api.delete(`/friends/${friendshipId}/reject/`);
+      // Reload all data to update counts
+      await loadAllData();
+    } catch (err) {
+      setError('Failed to reject request: ' + err.message);
+    }
+  };
+
+  const removeFriend = async (friendshipId) => {
+    if (!window.confirm('Remove this friend?')) return;
+    
+    try {
+      await api.delete(`/friends/${friendshipId}/`);
+      await loadAllData();
+    } catch (err) {
+      setError('Failed to remove friend: ' + err.message);
+    }
+  };
+
+  const filteredUsers = allUsers;
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className={`${
+          error.includes('sent!') ? 'bg-green-500/20 border-green-500 text-green-200' : 'bg-red-500/20 border-red-500 text-red-200'
+        } border px-4 py-3 rounded flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            {error.includes('sent!') ? (
+              <Check className="w-5 h-5" />
+            ) : (
+              <AlertCircle className="w-5 h-5" />
+            )}
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError('')} className="text-xl font-bold">×</button>
+        </div>
+      )}
+
+      <div className="flex gap-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('friends')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'friends' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Friends ({friends.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('incoming')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'incoming' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          Incoming ({incomingRequests.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('outgoing')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'outgoing' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Send className="w-4 h-4" />
+          Sent ({outgoingRequests.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('add')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'add' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+          Add Friends
+        </button>
+      </div>
+
+      {activeTab === 'add' && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search users by username or display name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 bg-slate-800 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+          />
+          {searchQuery && (
+            <p className="text-slate-400 text-sm mt-2">
+              {loading ? 'Searching...' : `Found ${filteredUsers.length} user${filteredUsers.length !== 1 ? 's' : ''}`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {loading && activeTab !== 'add' ? (
+        <div className="text-center text-slate-400 py-12">
+          <Loader className="w-8 h-8 animate-spin mx-auto mb-2" />
+          <p>Loading...</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {activeTab === 'friends' && (
+            friends.length > 0 ? (
+              friends.map((friend) => (
+                <FriendCard
+                  key={friend.friendship_id}
+                  friend={friend}
+                  onRemove={removeFriend}
+                />
+              ))
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <Users className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>No friends yet. Start adding some!</p>
+              </div>
+            )
+          )}
+
+          {activeTab === 'incoming' && (
+            incomingRequests.length > 0 ? (
+              incomingRequests.map((request) => (
+                <FriendRequestCard
+                  key={request.friendship_id}
+                  request={request}
+                  onAccept={acceptRequest}
+                  onReject={rejectRequest}
+                  type="incoming"
+                />
+              ))
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <User className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>No incoming friend requests</p>
+              </div>
+            )
+          )}
+
+          {activeTab === 'outgoing' && (
+            outgoingRequests.length > 0 ? (
+              outgoingRequests.map((request) => (
+                <FriendRequestCard
+                  key={request.friendship_id}
+                  request={request}
+                  onAccept={() => {}}
+                  onReject={rejectRequest}
+                  type="outgoing"
+                />
+              ))
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <Send className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>No pending friend requests</p>
+              </div>
+            )
+          )}
+
+          {activeTab === 'add' && (
+            filteredUsers.length > 0 ? (
+              filteredUsers.map((u) => (
+                <UserSearchCard
+                  key={u.user_id}
+                  user={u}
+                  onSendRequest={sendFriendRequest}
+                  requestSent={sentRequests.has(u.user_id)}
+                />
+              ))
+            ) : searchQuery.trim() ? (
+              <div className="text-center text-slate-400 py-12">
+                <Search className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>No users found matching "{searchQuery}"</p>
+              </div>
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <Search className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>Start typing to search for users</p>
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Write Review Component
 function WriteReview({ gameId, existingReview, onSave, onCancel }) {
   const [rating, setRating] = useState(existingReview?.rating || 0);
@@ -411,30 +936,23 @@ function GameReviews({ gameId, currentUserId, isAdmin }) {
   }, [gameId]);
   
   const loadReviews = async () => {
-  setLoading(true);
-  try {
-    const data = await api.get(`/reviews/games/${gameId}/`);
-    
-    // Fetch usernames for each review
-    const reviewsWithUsernames = await Promise.all(
-      data.map(async (review) => {
-        const username = await getUsername(review.user_id);
-        return { ...review, username };
-      })
-    );
-    
-    const mine = reviewsWithUsernames.find(r => r.user_id === currentUserId);
-    const others = reviewsWithUsernames.filter(r => r.user_id !== currentUserId);
-    
-    setMyReview(mine);
-    setReviews(others);
-    setShowWriteReview(!mine);
-  } catch (err) {
-    console.error('Failed to load reviews:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const data = await api.get(`/reviews/games/${gameId}/`);
+      
+      // Username is now included in the response, no need to fetch separately
+      const mine = data.find(r => r.user_id === currentUserId);
+      const others = data.filter(r => r.user_id !== currentUserId);
+      
+      setMyReview(mine);
+      setReviews(others);
+      setShowWriteReview(!mine);
+    } catch (err) {
+      console.error('Failed to load reviews:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const handleSaveReview = async (reviewData) => {
     if (editingReview) {
@@ -559,6 +1077,7 @@ function GameReviews({ gameId, currentUserId, isAdmin }) {
     </div>
   );
 }
+
 // Game Card Component
 function GameCard({ game, onSelect, isRAWG = false }) {
   return (
@@ -898,12 +1417,472 @@ function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false, us
   );
 }
 
+
+// Play Sessions Components 
+
+// Active Session Card
+function ActiveSessionCard({ session, game, onEnd }) {
+  const [notes, setNotes] = useState('');
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Parse the UTC time from backend and convert to local time
+  const startTime = new Date(session.start_time);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    // Calculate initial elapsed time
+    const now = new Date();
+    const initialDiff = Math.floor((now - startTime) / 1000);
+    setElapsed(initialDiff);
+
+    // Update every second
+    const interval = setInterval(() => {
+      const now = new Date();
+      const diff = Math.floor((now - startTime) / 1000);
+      setElapsed(diff);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [session.start_time]);
+
+  const formatDuration = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours}h ${minutes}m ${secs}s`;
+  };
+
+  const handleEndSession = async () => {
+    setLoading(true);
+    try {
+      const endData = { 
+        session_notes: notes || null 
+      };
+      // Don't send end_time, let backend use current time
+      await onEnd(session.session_id, endData);
+      setShowEndModal(false);
+    } catch (err) {
+      console.error('Failed to end session:', err);
+      alert('Failed to end session: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="bg-gradient-to-r from-purple-900 to-purple-700 rounded-lg p-6 border-2 border-purple-500">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center animate-pulse">
+              <Play className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-lg">Active Session</h3>
+              <p className="text-purple-200 text-sm">{game?.title || 'Unknown Game'}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowEndModal(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2"
+          >
+            <Square className="w-4 h-4" />
+            End Session
+          </button>
+        </div>
+        
+        <div className="bg-black/30 rounded-lg p-4">
+          <div className="text-center">
+            <p className="text-purple-200 text-sm mb-2">Session Duration</p>
+            <p className="text-white text-3xl font-bold font-mono">{formatDuration(elapsed)}</p>
+          </div>
+        </div>
+      </div>
+
+      {showEndModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setShowEndModal(false)}>
+          <div className="bg-slate-800 rounded-lg max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-white text-xl font-bold mb-4">End Gaming Session</h3>
+            
+            <div className="mb-4">
+              <p className="text-slate-300 mb-2">Total Duration: <span className="text-white font-bold">{formatDuration(elapsed)}</span></p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-slate-400 mb-2">Session Notes (Optional)</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="How was your session? Any achievements or progress?"
+                className="w-full px-4 py-3 bg-slate-700 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-24"
+                maxLength={500}
+              />
+              <p className="text-slate-500 text-xs mt-1">{notes.length}/500 characters</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleEndSession}
+                disabled={loading}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded font-semibold disabled:opacity-50"
+              >
+                {loading ? 'Ending...' : 'End Session'}
+              </button>
+              <button
+                onClick={() => setShowEndModal(false)}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// Session History Card
+function SessionHistoryCard({ session, game }) {
+  const startTime = new Date(session.start_time);
+  const endTime = session.end_time ? new Date(session.end_time) : null;
+  
+  const duration = endTime ? Math.floor((endTime - startTime) / 1000) : 0;
+  const hours = Math.floor(duration / 3600);
+  const minutes = Math.floor((duration % 3600) / 60);
+
+  return (
+    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          {game?.cover_image_url ? (
+            <img src={game.cover_image_url} alt={game.title} className="w-16 h-16 rounded object-cover" />
+          ) : (
+            <div className="w-16 h-16 bg-slate-600 rounded flex items-center justify-center">
+              <Gamepad2 className="w-8 h-8 text-slate-400" />
+            </div>
+          )}
+          <div>
+            <h4 className="text-white font-semibold">{game?.title || 'Unknown Game'}</h4>
+            <p className="text-slate-400 text-sm">
+              {startTime.toLocaleDateString()} at {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-white font-bold">{hours}h {minutes}m</p>
+          <p className="text-slate-400 text-xs">Duration</p>
+        </div>
+      </div>
+      
+      {session.session_notes && (
+        <div className="bg-slate-800 rounded p-3 mt-3">
+          <p className="text-slate-300 text-sm italic">"{session.session_notes}"</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Game Playtime Stats Card
+function GamePlaytimeCard({ game, playtime, onStartSession }) {
+  return (
+    <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-purple-500 transition-colors">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {game.cover_image_url ? (
+            <img src={game.cover_image_url} alt={game.title} className="w-16 h-16 rounded object-cover" />
+          ) : (
+            <div className="w-16 h-16 bg-slate-600 rounded flex items-center justify-center">
+              <Gamepad2 className="w-8 h-8 text-slate-400" />
+            </div>
+          )}
+          <div>
+            <h4 className="text-white font-semibold">{game.title}</h4>
+            <p className="text-slate-400 text-sm">{playtime.formatted}</p>
+            <p className="text-slate-500 text-xs">{playtime.session_count} session{playtime.session_count !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <button
+          onClick={() => onStartSession(game.game_id)}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded flex items-center gap-2"
+        >
+          <Play className="w-4 h-4" />
+          Start
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Main Play Sessions Page
+function PlaySessionsPage() {
+  const [activeTab, setActiveTab] = useState('active');
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [collectionGames, setCollectionGames] = useState([]);
+  const [playtimeStats, setPlaytimeStats] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [sessionsData, collectionData] = await Promise.all([
+        api.get('/sessions/?active_only=true'),
+        api.get('/collection/')
+      ]);
+      
+      setActiveSessions(sessionsData);
+      setCollectionGames(collectionData);
+      
+      // Load playtime for each game
+      const playtimes = {};
+      for (const game of collectionData) {
+        try {
+          const stats = await api.get(`/sessions/games/${game.game_id}/playtime/`);
+          playtimes[game.game_id] = stats;
+        } catch (err) {
+          console.error(`Failed to load playtime for ${game.game_id}:`, err);
+        }
+      }
+      setPlaytimeStats(playtimes);
+    } catch (err) {
+      setError('Failed to load data: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadHistory = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/sessions/');
+      setHistory(data);
+    } catch (err) {
+      setError('Failed to load history: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startSession = async (gameId) => {
+    try {
+      await api.post('/sessions/start/', { game_id: gameId });
+      await loadData();
+      setActiveTab('active');
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const endSession = async (sessionId, data) => {
+    try {
+      console.log('Ending session:', sessionId, 'with data:', data);
+      const response = await api.put(`/sessions/${sessionId}/end/`, data);
+      console.log('End session response:', response);
+      await loadData();
+      setError('Session ended successfully!');
+      setTimeout(() => setError(''), 3000);
+    } catch (err) {
+      console.error('Failed to end session:', err);
+      setError('Failed to end session: ' + err.message);
+    }
+  };
+
+  // Get game data for sessions
+  const getGameForSession = (gameId) => {
+    return collectionGames.find(g => g.game_id === gameId);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      loadHistory();
+    }
+  }, [activeTab]);
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError('')} className="text-xl font-bold">×</button>
+        </div>
+      )}
+
+      {/* Tabs */}
+      <div className="flex gap-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'active' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Play className="w-4 h-4" />
+          Active ({activeSessions.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('start')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'start' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Gamepad2 className="w-4 h-4" />
+          Start Session
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'history' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          History
+        </button>
+        <button
+          onClick={() => setActiveTab('stats')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'stats' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Stats
+        </button>
+      </div>
+
+      {/* Content */}
+      {loading && activeTab !== 'active' ? (
+        <div className="text-center text-slate-400 py-12">
+          <Loader className="w-8 h-8 animate-spin mx-auto mb-2" />
+          <p>Loading...</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {activeTab === 'active' && (
+            activeSessions.length > 0 ? (
+              activeSessions.map((session) => (
+                <ActiveSessionCard
+                  key={session.session_id}
+                  session={session}
+                  game={getGameForSession(session.game_id)}
+                  onEnd={endSession}
+                />
+              ))
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <Play className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>No active sessions</p>
+                <button
+                  onClick={() => setActiveTab('start')}
+                  className="mt-4 bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded"
+                >
+                  Start a Session
+                </button>
+              </div>
+            )
+          )}
+
+          {activeTab === 'start' && (
+            collectionGames.length > 0 ? (
+              collectionGames.map((game) => (
+                <GamePlaytimeCard
+                  key={game.game_id}
+                  game={game}
+                  playtime={playtimeStats[game.game_id] || { formatted: '0h 0m', session_count: 0 }}
+                  onStartSession={startSession}
+                />
+              ))
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <Gamepad2 className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>No games in collection. Add games first!</p>
+              </div>
+            )
+          )}
+
+          {activeTab === 'history' && (
+            history.length > 0 ? (
+              history.map((session) => (
+                <SessionHistoryCard
+                  key={session.session_id}
+                  session={session}
+                  game={getGameForSession(session.game_id)}
+                />
+              ))
+            ) : (
+              <div className="text-center text-slate-400 py-12">
+                <Clock className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                <p>No session history yet</p>
+              </div>
+            )
+          )}
+
+          {activeTab === 'stats' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(playtimeStats).length > 0 ? (
+                Object.entries(playtimeStats)
+                  .sort(([, a], [, b]) => b.total_seconds - a.total_seconds)
+                  .map(([gameId, stats]) => {
+                    const game = collectionGames.find(g => g.game_id === gameId);
+                    if (!game) return null;
+                    
+                    return (
+                      <div key={gameId} className="bg-slate-700 rounded-lg p-4 border border-slate-600">
+                        <div className="flex items-center gap-3 mb-3">
+                          {game.cover_image_url ? (
+                            <img src={game.cover_image_url} alt={game.title} className="w-12 h-12 rounded object-cover" />
+                          ) : (
+                            <div className="w-12 h-12 bg-slate-600 rounded flex items-center justify-center">
+                              <Gamepad2 className="w-6 h-6 text-slate-400" />
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="text-white font-semibold">{game.title}</h4>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-slate-800 rounded p-3">
+                            <p className="text-slate-400 text-xs mb-1">Total Time</p>
+                            <p className="text-white font-bold text-lg">{stats.formatted}</p>
+                          </div>
+                          <div className="bg-slate-800 rounded p-3">
+                            <p className="text-slate-400 text-xs mb-1">Sessions</p>
+                            <p className="text-white font-bold text-lg">{stats.session_count}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="col-span-2 text-center text-slate-400 py-12">
+                  <BarChart3 className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+                  <p>No playtime data yet. Start tracking your sessions!</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Main App Component
 function GameHub() {
   const { user, logout } = React.useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('discover');
   const [games, setGames] = useState([]);
   const [collection, setCollection] = useState([]);
+  const [friendsCount, setFriendsCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGame, setSelectedGame] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
@@ -911,13 +1890,33 @@ function GameHub() {
   const [isRAWGSearch, setIsRAWGSearch] = useState(false);
   const [error, setError] = useState('');
 
+  // Load initial counts when component mounts
+  useEffect(() => {
+    loadInitialCounts();
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'discover') {
       loadGames();
     } else if (activeTab === 'collection') {
       loadCollection();
     }
+    // Friends tab handles its own loading
   }, [activeTab]);
+
+  const loadInitialCounts = async () => {
+    try {
+      // Load collection count
+      const collectionData = await api.get('/collection/');
+      setCollection(collectionData);
+      
+      // Load friends count
+      const friendsData = await api.get('/friends/details/');
+      setFriendsCount(friendsData.count || 0);
+    } catch (err) {
+      console.error('Failed to load initial counts:', err);
+    }
+  };
 
   const loadGames = async () => {
     setLoading(true);
@@ -1000,7 +1999,7 @@ function GameHub() {
           
           <div className="flex items-center gap-4">
             <span className="text-slate-300">{user?.display_name || user?.username}</span>
-            {user?.role === 'admin' && (
+            {user?.role === 'ADMIN' && (
               <span className="bg-purple-600 text-white px-2 py-1 rounded text-xs">ADMIN</span>
             )}
             <button
@@ -1015,14 +2014,15 @@ function GameHub() {
       </header>
 
       <div className="max-w-7xl mx-auto p-6">
-        <div className="flex gap-4 mb-6">
+        {/* Tabs */}
+        <div className="flex gap-4 mb-6 overflow-x-auto">
           <button
             onClick={() => {
               setActiveTab('discover');
               setSearchQuery('');
               setIsRAWGSearch(false);
             }}
-            className={`flex items-center gap-2 px-4 py-2 rounded ${
+            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
               activeTab === 'discover' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
             }`}
           >
@@ -1031,141 +2031,168 @@ function GameHub() {
           </button>
           <button
             onClick={() => setActiveTab('collection')}
-            className={`flex items-center gap-2 px-4 py-2 rounded ${
+            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
               activeTab === 'collection' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
             }`}
           >
             <Library className="w-4 h-4" />
             My Collection ({collection.length})
           </button>
+          <button
+            onClick={() => setActiveTab('sessions')}
+            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+              activeTab === 'sessions' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            Sessions
+          </button>
+          <button
+            onClick={() => setActiveTab('friends')}
+            className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+              activeTab === 'friends' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Friends ({friendsCount})
+          </button>
         </div>
 
-        {activeTab === 'discover' && (
-          <div className="mb-6">
-            <div className="flex gap-3 mb-3">
-              <input
-                type="text"
-                placeholder="Search games..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && searchRAWG()}
-                className="flex-1 px-4 py-2 bg-slate-800 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-              <button
-                onClick={searchRAWG}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-semibold flex items-center gap-2"
-              >
-                <Search className="w-4 h-4" />
-                Search RAWG
-              </button>
-              <button
-                onClick={loadGames}
-                className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded font-semibold"
-              >
-                Browse Database
-              </button>
-            </div>
-            {isRAWGSearch && (
-              <div className="bg-purple-600/20 border border-purple-600 text-purple-200 px-4 py-2 rounded">
-                Searching RAWG database. Games will be imported when added to collection.
+        {/* Tab Content */}
+        {activeTab === 'friends' ? (
+          <FriendsPage onFriendsUpdate={(count) => setFriendsCount(count)} />
+        ) : activeTab === 'sessions' ? (
+          <PlaySessionsPage />
+        ) : (
+          <>
+            {activeTab === 'discover' && (
+              <div className="mb-6">
+                <div className="flex gap-3 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Search games..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && searchRAWG()}
+                    className="flex-1 px-4 py-2 bg-slate-800 text-white rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    onClick={searchRAWG}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-semibold flex items-center gap-2"
+                  >
+                    <Search className="w-4 h-4" />
+                    Search RAWG
+                  </button>
+                  <button
+                    onClick={loadGames}
+                    className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-2 rounded font-semibold"
+                  >
+                    Browse Database
+                  </button>
+                </div>
+                {isRAWGSearch && (
+                  <div className="bg-purple-600/20 border border-purple-600 text-purple-200 px-4 py-2 rounded">
+                    Searching RAWG database. Games will be imported when added to collection.
+                  </div>
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {loading ? (
-          <div className="text-center text-slate-400 py-12 flex flex-col items-center gap-3">
-            <Loader className="w-8 h-8 animate-spin" />
-            <p>Loading...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {activeTab === 'discover' ? (
-              filteredGames.length > 0 ? (
-                filteredGames.map((game) => (
-                  <GameCard 
-                    key={game.game_id || game.external_api_id} 
-                    game={game} 
-                    onSelect={handleGameSelect}
-                    isRAWG={isRAWGSearch}
-                  />
-                ))
-              ) : (
-                <div className="col-span-full text-center text-slate-400 py-12">
-                  No games found. Try searching!
-                </div>
-              )
+            {loading ? (
+              <div className="text-center text-slate-400 py-12 flex flex-col items-center gap-3">
+                <Loader className="w-8 h-8 animate-spin" />
+                <p>Loading...</p>
+              </div>
             ) : (
-              collection.length > 0 ? (
-                collection.map((item) => (
-                  <div key={item.game_id} className="relative group">
-                    <div 
-                      className="bg-slate-800 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105"
-                      onClick={() => setEditingItem(item)}
-                    >
-                      {item.cover_image_url ? (
-                        <img src={item.cover_image_url} alt={item.title} className="w-full h-48 object-cover" />
-                      ) : (
-                        <div className="w-full h-48 bg-slate-700 flex items-center justify-center">
-                          <Gamepad2 className="w-16 h-16 text-slate-600" />
-                        </div>
-                      )}
-                      <div className="p-4">
-                        <h3 className="text-white font-semibold text-lg mb-1 truncate">{item.title}</h3>
-                        <p className="text-slate-400 text-sm mb-2">{item.developer || 'Unknown Developer'}</p>
-                        
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded">
-                            {item.play_status ? item.play_status.replace(/_/g, ' ') : 'UNKNOWN'}
-                          </span>
-                          {item.rating && (
-                            <div className="flex items-center gap-1">
-                              {[...Array(5)].map((_, i) => (
-                                <Star
-                                  key={i}
-                                  className={`w-4 h-4 ${i < item.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600'}`}
-                                />
-                              ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {activeTab === 'discover' ? (
+                  filteredGames.length > 0 ? (
+                    filteredGames.map((game) => (
+                      <GameCard 
+                        key={game.game_id || game.external_api_id} 
+                        game={game} 
+                        onSelect={handleGameSelect}
+                        isRAWG={isRAWGSearch}
+                      />
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center text-slate-400 py-12">
+                      No games found. Try searching!
+                    </div>
+                  )
+                ) : (
+                  collection.length > 0 ? (
+                    collection.map((item) => (
+                      <div key={item.game_id} className="relative group">
+                        <div 
+                          className="bg-slate-800 rounded-lg overflow-hidden cursor-pointer transition-transform hover:scale-105"
+                          onClick={() => setEditingItem(item)}
+                        >
+                          {item.cover_image_url ? (
+                            <img src={item.cover_image_url} alt={item.title} className="w-full h-48 object-cover" />
+                          ) : (
+                            <div className="w-full h-48 bg-slate-700 flex items-center justify-center">
+                              <Gamepad2 className="w-16 h-16 text-slate-600" />
                             </div>
                           )}
+                          <div className="p-4">
+                            <h3 className="text-white font-semibold text-lg mb-1 truncate">{item.title}</h3>
+                            <p className="text-slate-400 text-sm mb-2">{item.developer || 'Unknown Developer'}</p>
+                            
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-slate-500 bg-slate-700 px-2 py-1 rounded">
+                                {item.play_status ? item.play_status.replace(/_/g, ' ') : 'UNKNOWN'}
+                              </span>
+                              {item.rating && (
+                                <div className="flex items-center gap-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-4 h-4 ${i < item.rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-600'}`}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {item.personal_notes && (
+                              <p className="text-slate-400 text-xs italic truncate">"{item.personal_notes}"</p>
+                            )}
+                          </div>
                         </div>
                         
-                        {item.personal_notes && (
-                          <p className="text-slate-400 text-xs italic truncate">"{item.personal_notes}"</p>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFromCollection(item.game_id);
+                          }}
+                          className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-lg transition-all hover:scale-110 z-10"
+                          title="Remove from collection"
+                        >
+                          ✕
+                        </button>
                       </div>
+                    ))
+                  ) : (
+                    <div className="col-span-full text-center text-slate-400 py-12">
+                      Your collection is empty. Start adding games!
                     </div>
-                    
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFromCollection(item.game_id);
-                      }}
-                      className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white w-9 h-9 rounded-full flex items-center justify-center font-bold shadow-lg transition-all hover:scale-110 z-10"
-                      title="Remove from collection"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-full text-center text-slate-400 py-12">
-                  Your collection is empty. Start adding games!
-                </div>
-              )
+                  )
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
       {selectedGame && (
         <GameDetailsModal
-			game={selectedGame}
-			onClose={() => setSelectedGame(null)}
-			onAddToCollection={addToCollection}
-			isRAWG={selectedGame.isRAWG}
-			user={user}
-		/>
+          game={selectedGame}
+          onClose={() => setSelectedGame(null)}
+          onAddToCollection={addToCollection}
+          isRAWG={selectedGame.isRAWG}
+          user={user}
+        />
       )}
 
       {editingItem && (

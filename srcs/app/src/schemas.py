@@ -184,7 +184,18 @@ class ReviewOut(BaseModel):
     review_text: Optional[str] = None
     rating: int
     review_date: datetime
-    
+ 
+# GET /reviews/games/{game_id}/ with username (Output)
+class ReviewWithUserOut(BaseModel):
+    review_id: str
+    user_id: str
+    game_id: str
+    review_text: Optional[str] = None
+    rating: int
+    review_date: datetime
+    username: str
+    display_name: Optional[str] = None
+     
     class Config:
         from_attributes = True
 
@@ -197,6 +208,21 @@ class FriendRequestOut(BaseModel):
     user_id_recipient: str
     friendship_date: datetime
     friendship_status: FriendshipStatus
+    
+ # Friend Request with User Info (Output)
+class FriendRequestWithUserOut(BaseModel):
+    friendship_id: str
+    user_id_initiator: str
+    user_id_recipient: str
+    friendship_date: datetime
+    friendship_status: FriendshipStatus
+    # Optional fields for user info
+    initiator_username: Optional[str] = None
+    initiator_display_name: Optional[str] = None
+    initiator_profile_picture_url: Optional[str] = None
+    recipient_username: Optional[str] = None
+    recipient_display_name: Optional[str] = None
+    recipient_profile_picture_url: Optional[str] = None
     
     class Config:
         from_attributes = True

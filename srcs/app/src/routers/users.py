@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_  
 from typing import List
 
 from database import get_db
@@ -35,6 +36,40 @@ async def update_profile(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.get("/search/", response_model=List[schemas.UserPublicOut])
+async def search_users(
+    query: str = "",
+    current_user: CurrentUser = None,
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db)
+):
+    """
+    Public endpoint to search for users by username or display name.
+    Used for finding friends to add.
+    """
+    if not query or len(query.strip()) == 0:
+        # Return empty list if no query
+        return []
+    
+    query = query.strip().lower()
+    
+    # Search by username or display_name
+    users = db.query(User).filter(
+        or_(
+            User.username.ilike(f"%{query}%"),
+            User.display_name.ilike(f"%{query}%")
+        )
+    ).offset(skip).limit(limit).all()
+    
+    # Filter out current user from results
+    if current_user:
+        users = [u for u in users if u.user_id != current_user.user_id]
+    
+    return users
+
 
 @router.get("/{user_id}", response_model=schemas.UserPublicOut)
 async def get_user_profile(user_id: str, db: Session = Depends(get_db)):
