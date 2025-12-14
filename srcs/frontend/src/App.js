@@ -72,7 +72,9 @@ const getImageUrl = (url) => {
   if (!url) return null;
   if (url.startsWith('http')) return url;
   if (url.startsWith('/static/')) {
-    return `/api${url}`;  // Converts /static/profiles/x.jpg to /api/static/profiles/x.jpg
+    // Add timestamp to prevent browser caching of profile pictures
+    const timestamp = new Date().getTime();
+    return `/api${url}?t=${timestamp}`;
   }
   return url;
 };
