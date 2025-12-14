@@ -67,6 +67,16 @@ async function getUsername(userId) {
   }
 }
 
+// Helper to get profile picture url
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  if (url.startsWith('/static/')) {
+    return `/api${url}`;  // Converts /static/profiles/x.jpg to /api/static/profiles/x.jpg
+  }
+  return url;
+};
+
 // Auth Context
 const AuthContext = React.createContext(null);
 
@@ -346,12 +356,12 @@ function FriendCard({ friend, onRemove, onViewProfile, showRemove = true }) {
         onClick={() => onViewProfile && onViewProfile(friend.friend_user_id)}
       >
         {friend.friend_profile_picture_url ? (
-          <img 
-            src={friend.friend_profile_picture_url} 
-            alt={friend.friend_username}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-        ) : (
+		<img 
+		src={getImageUrl(friend.friend_profile_picture_url)} 
+		alt={friend.friend_username}
+		className="w-12 h-12 rounded-full object-cover"
+			/>
+		) : (
           <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
             <User className="w-6 h-6 text-white" />
           </div>
@@ -420,12 +430,12 @@ function FriendRequestCard({ request, onAccept, onReject, type = 'incoming' }) {
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {userInfo.profilePicture ? (
-          <img 
-            src={userInfo.profilePicture} 
-            alt={displayName}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-        ) : (
+  <img 
+    src={getImageUrl(userInfo.profilePicture)} 
+    alt={displayName}
+    className="w-12 h-12 rounded-full object-cover"
+  />
+) : (
           <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
             <User className="w-6 h-6 text-white" />
           </div>
@@ -493,12 +503,12 @@ function UserSearchCard({ user, onSendRequest, requestSent }) {
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {user.profile_picture_url ? (
-          <img 
-            src={user.profile_picture_url} 
-            alt={user.username}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-        ) : (
+		  <img 
+			src={getImageUrl(user.profile_picture_url)} 
+			alt={user.username}
+			className="w-12 h-12 rounded-full object-cover"
+		  />
+		) : (
           <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center">
             <User className="w-6 h-6 text-white" />
           </div>
@@ -2022,12 +2032,12 @@ function ProfilePictureUpload({ currentPictureUrl, onUploadSuccess }) {
     <div className="flex flex-col items-center gap-3">
       <div className="relative">
         {currentPictureUrl ? (
-          <img
-            src={currentPictureUrl}
-            alt="Profile"
-            className="w-32 h-32 rounded-full object-cover border-4 border-purple-600"
-          />
-        ) : (
+		  <img
+			src={getImageUrl(currentPictureUrl)}
+			alt="Profile"
+			className="w-32 h-32 rounded-full object-cover border-4 border-purple-600"
+		  />
+		) : (
           <div className="w-32 h-32 rounded-full bg-purple-600 flex items-center justify-center border-4 border-purple-700">
             <User className="w-16 h-16 text-white" />
           </div>
@@ -2249,12 +2259,12 @@ function ProfilePage({ userId, isOwnProfile, onClose }) {
                 onUploadSuccess={handleProfilePictureUpdate}
               />
             ) : profile.profile_picture_url ? (
-              <img
-                src={profile.profile_picture_url}
-                alt={displayName}
-                className="w-32 h-32 rounded-full object-cover border-4 border-purple-600"
-              />
-            ) : (
+			  <img
+				src={getImageUrl(profile.profile_picture_url)}
+				alt={displayName}
+				className="w-32 h-32 rounded-full object-cover border-4 border-purple-600"
+			  />
+			) : (
               <div className="w-32 h-32 rounded-full bg-purple-600 flex items-center justify-center border-4 border-purple-700">
                 <User className="w-16 h-16 text-white" />
               </div>
