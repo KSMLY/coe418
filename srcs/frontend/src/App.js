@@ -185,13 +185,20 @@ function ReviewCard({ review, currentUserId, isAdmin, onEdit, onDelete, onViewPr
     <div className="bg-slate-700 rounded-lg p-4 border border-slate-600">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div 
-            className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
-            onClick={() => onViewProfile && onViewProfile(review.user_id)}
-            title="View profile"
-          >
-            <User className="w-5 h-5 text-white" />
-          </div>
+		{review.profile_picture_url ? (
+		  <img 
+			src={getImageUrl(review.profile_picture_url)} 
+			alt={displayName}
+			className="w-10 h-10 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
+			onClick={() => onViewProfile && onViewProfile(review.user_id)}
+		  />
+		) : (
+		  <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-purple-400 transition-all"
+			onClick={() => onViewProfile && onViewProfile(review.user_id)}
+		  >
+			<User className="w-5 h-5 text-white" />
+		  </div>
+		)}
           <div>
             <p 
               className="text-white font-semibold cursor-pointer hover:text-purple-300 transition-colors"
@@ -952,7 +959,7 @@ function WriteReview({ gameId, existingReview, onSave, onCancel }) {
 }
 
 // Game Reviews Component
-function GameReviews({ gameId, currentUserId, isAdmin }) {
+function GameReviews({ gameId, currentUserId, isAdmin, onViewProfile }) {
   const [reviews, setReviews] = useState([]);
   const [myReview, setMyReview] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1268,15 +1275,22 @@ function CollectionEditModal({ item, onClose, onUpdate }) {
 }
 
 // Game Details Modal
-function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false, user }) {
+function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false, user, onViewProfile }) {
   const [loading, setLoading] = useState(false);
   const [playStatus, setPlayStatus] = useState('NOT_STARTED');
   const [rating, setRating] = useState(null);
   const [error, setError] = useState('');
 
+  const handleViewProfile = (userId) => {
+    onClose(); // Close the modal first
+    onViewProfile(userId); // Then navigate to profile
+  };
+  
   const handleAdd = async () => {
     setLoading(true);
     setError('');
+	
+  
     
     try {
       console.log('Adding game:', game);
@@ -1368,7 +1382,7 @@ function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false, us
 			<GameReviews 
 			gameId={game.game_id} 
 			currentUserId={user?.user_id}
-			isAdmin={user?.role === 'admin'}
+			isAdmin={user?.role === 'ADMIN'}
 			onViewProfile={onViewProfile}
 				/>
 			</div>

@@ -132,6 +132,35 @@ async def update_notes(
     
     return {"message": "Notes updated"}
 
+@router.get("/user/{user_id}/", response_model=List[schemas.UserGameOut])
+async def get_user_collection(
+    user_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get a user's public collection."""
+    query = db.query(UserGames, Game).join(
+        Game, UserGames.game_id == Game.game_id
+    ).filter(UserGames.user_id == user_id)
+    
+    results = query.all()
+    
+    collection = []
+    for user_game, game in results:
+        game_data = {
+            "game_id": game.game_id,
+            "title": game.title,
+            "developer": game.developer,
+            "release_date": game.release_date,
+            "cover_image_url": game.cover_image_url,
+            "play_status": user_game.play_status,
+            "personal_notes": user_game.personal_notes,
+            "rating": user_game.rating
+        }
+        collection.append(schemas.UserGameOut(**game_data))
+    
+    return collection
+
+
 @router.delete("/{game_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_from_collection(
     game_id: str,

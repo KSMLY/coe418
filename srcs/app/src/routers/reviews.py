@@ -116,7 +116,8 @@ async def get_review(
         "rating": review.rating,
         "review_date": review.review_date,
         "username": user.username,
-        "display_name": user.display_name
+        "display_name": user.display_name,
+        "profile_picture_url": user.profile_picture_url
     }
     
     return review_dict

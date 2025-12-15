@@ -195,6 +195,7 @@ class ReviewWithUserOut(BaseModel):
     review_date: datetime
     username: str
     display_name: Optional[str] = None
+    profile_picture_url: Optional[str] = None
      
     class Config:
         from_attributes = True
