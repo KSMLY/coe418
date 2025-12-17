@@ -103,6 +103,18 @@ CREATE TABLE IF NOT EXISTS FRIENDS (
     FOREIGN KEY (user_id_recipient) REFERENCES USER(user_id) ON DELETE CASCADE
 );
 
+DELIMITER //
+CREATE TRIGGER validate_review_rating
+BEFORE INSERT ON REVIEW
+FOR EACH ROW
+BEGIN
+    IF NEW.rating < 1 OR NEW.rating > 5 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Rating must be between 1 and 5';
+    END IF;
+END//
+DELIMITER ;
+
 -- USER-GAME VIEW
 CREATE VIEW user_game_stats AS
 SELECT 
@@ -114,24 +126,6 @@ FROM USER u
 LEFT JOIN USER_GAMES ug ON u.user_id = ug.user_id
 GROUP BY u.user_id, u.username;
 
--- trigger for reviews
--- DELIMITER//
--- CREATE TRIGGER prevent_duplicate_review
--- BEFORE INSERT ON REVIEW
--- FOR EACH ROW
--- BEGIN
---     IF EXISTS (
---         SELECT 1 FROM REVIEW 
---         WHERE user_id = NEW.user_id 
---         AND game_id = NEW.game_id
---     ) THEN
---         SIGNAL SQLSTATE '45000'
---         SET MESSAGE_TEXT = 'User already reviewed this game';
---     END IF;
--- END//
--- DELIMITER ;
-
--- indexing
 CREATE INDEX idx_user_games_status ON USER_GAMES(user_id, play_status);
 CREATE INDEX idx_review_game_rating ON REVIEW(game_id, rating);
 CREATE INDEX idx_session_user_active ON PLAY_SESSION(user_id, end_time);
