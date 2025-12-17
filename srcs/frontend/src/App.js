@@ -1383,7 +1383,7 @@ function GameDetailsModal({ game, onClose, onAddToCollection, isRAWG = false, us
 			gameId={game.game_id} 
 			currentUserId={user?.user_id}
 			isAdmin={user?.role === 'ADMIN'}
-			onViewProfile={onViewProfile}
+			onViewProfile={handleViewProfile}
 				/>
 			</div>
 		)}
@@ -2152,53 +2152,53 @@ function ProfilePage({ userId, isOwnProfile, onClose }) {
   }, [userId]);
 
   const loadProfile = async () => {
-    setLoading(true);
-    try {
-      // Load user profile
-      const profileData = isOwnProfile
-        ? await api.get('/users/profile/')
-        : await api.get(`/users/${userId}`);
-      
-      setProfile(profileData);
-      setEditData({
-        email: profileData.email || '',
-        display_name: profileData.display_name || ''
-      });
+  setLoading(true);
+  try {
+    // Load user profile
+    const profileData = isOwnProfile
+      ? await api.get('/users/profile/')
+      : await api.get(`/users/${userId}`);
+    
+    setProfile(profileData);
+    setEditData({
+      email: profileData.email || '',
+      display_name: profileData.display_name || ''
+    });
 
-      // Load stats and data
-      const [gamesData, reviewsData, friendsData, playtimeData] = await Promise.all([
-        isOwnProfile 
-          ? api.get('/collection/')
-          : api.get(`/collection/`).catch(() => []), // Public collection endpoint needed
-        api.get(`/reviews/users/${profileData.user_id}/`).catch(() => []),
-        isOwnProfile
-          ? api.get('/friends/details/')
-          : Promise.resolve({ count: 0 }), // Can't see other's friends list
-        isOwnProfile
-          ? api.get('/sessions/stats/playtime/').catch(() => ({ total_playtime_hours: 0 }))
-          : Promise.resolve({ total_playtime_hours: 0 })
-      ]);
+    // Load stats and data
+    const [gamesData, reviewsData, friendsData, playtimeData] = await Promise.all([
+      isOwnProfile 
+        ? api.get('/collection/')
+        : api.get(`/collection/user/${profileData.user_id}/`).catch(() => []), // ✅ FIXED: Use user-specific endpoint
+      api.get(`/reviews/users/${profileData.user_id}/`).catch(() => []),
+      isOwnProfile
+        ? api.get('/friends/details/')
+        : Promise.resolve({ count: 0 }), // Can't see other's friends list
+      isOwnProfile
+        ? api.get('/sessions/stats/playtime/').catch(() => ({ total_playtime_hours: 0 }))
+        : Promise.resolve({ total_playtime_hours: 0 })
+    ]);
 
-      setGames(gamesData);
-      setReviews(reviewsData);
-      setStats({
-        gamesCount: Array.isArray(gamesData) ? gamesData.length : 0,
-        totalHours: playtimeData.total_playtime_hours || 0,
-        reviewsCount: Array.isArray(reviewsData) ? reviewsData.length : 0,
-        friendsCount: friendsData.count || 0
-      });
+    setGames(gamesData);
+    setReviews(reviewsData);
+    setStats({
+      gamesCount: Array.isArray(gamesData) ? gamesData.length : 0,
+      totalHours: playtimeData.total_playtime_hours || 0,
+      reviewsCount: Array.isArray(reviewsData) ? reviewsData.length : 0,
+      friendsCount: friendsData.count || 0
+    });
 
-      // Check friendship status if viewing another user
-      if (!isOwnProfile) {
-        const friendStatus = await api.get(`/friends/check/${userId}/`);
-        setFriendshipStatus(friendStatus);
-      }
-    } catch (err) {
-      setError('Failed to load profile: ' + err.message);
-    } finally {
-      setLoading(false);
+    // Check friendship status if viewing another user
+    if (!isOwnProfile) {
+      const friendStatus = await api.get(`/friends/check/${userId}/`);
+      setFriendshipStatus(friendStatus);
     }
-  };
+  } catch (err) {
+    setError('Failed to load profile: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleProfilePictureUpdate = async (newUrl) => {
     setProfile({ ...profile, profile_picture_url: newUrl });

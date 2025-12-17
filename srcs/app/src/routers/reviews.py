@@ -70,14 +70,14 @@ async def get_game_reviews(
     if not game:
         raise HTTPException(status_code=404, detail="Game not found")
     
-    # Join Review with User to get username
+    # Join Review with User to get username AND profile_picture_url
     reviews = db.query(Review, User).join(
         User, Review.user_id == User.user_id
     ).filter(
         Review.game_id == game_id
     ).offset(skip).limit(limit).all()
     
-    # Format response with username
+    # Format response with username AND profile_picture_url
     result = []
     for review, user in reviews:
         review_dict = {
@@ -88,7 +88,8 @@ async def get_game_reviews(
             "rating": review.rating,
             "review_date": review.review_date,
             "username": user.username,
-            "display_name": user.display_name
+            "display_name": user.display_name,
+            "profile_picture_url": user.profile_picture_url  
         }
         result.append(review_dict)
     
@@ -117,7 +118,7 @@ async def get_review(
         "review_date": review.review_date,
         "username": user.username,
         "display_name": user.display_name,
-        "profile_picture_url": user.profile_picture_url
+        "profile_picture_url": user.profile_picture_url 
     }
     
     return review_dict
@@ -148,7 +149,8 @@ async def get_my_review_for_game(
         "rating": review.rating,
         "review_date": review.review_date,
         "username": user.username,
-        "display_name": user.display_name
+        "display_name": user.display_name,
+        "profile_picture_url": user.profile_picture_url 
     }
     
     return review_dict
@@ -177,7 +179,8 @@ async def get_my_reviews(
             "rating": review.rating,
             "review_date": review.review_date,
             "username": user.username,
-            "display_name": user.display_name
+            "display_name": user.display_name,
+            "profile_picture_url": user.profile_picture_url 
         }
         result.append(review_dict)
     
@@ -212,7 +215,8 @@ async def get_user_reviews(
             "rating": review.rating,
             "review_date": review.review_date,
             "username": user.username,
-            "display_name": user.display_name
+            "display_name": user.display_name,
+            "profile_picture_url": user.profile_picture_url 
         }
         result.append(review_dict)
     
@@ -254,7 +258,8 @@ async def update_review(
         "rating": review.rating,
         "review_date": review.review_date,
         "username": user.username,
-        "display_name": user.display_name
+        "display_name": user.display_name,
+        "profile_picture_url": user.profile_picture_url
     }
     
     return review_dict
