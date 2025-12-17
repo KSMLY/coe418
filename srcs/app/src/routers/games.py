@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from typing import List, Optional
 
 from database import get_db
@@ -25,7 +25,6 @@ async def search_rawg_games(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"RAWG API error: {str(e)}")
 
-# CHANGED: Allow any authenticated user to import (not just admin)
 @router.post("/import-from-rawg/{rawg_id}", response_model=schemas.GameOut, status_code=status.HTTP_201_CREATED)
 async def import_game_from_rawg(
     rawg_id: int,
@@ -236,3 +235,97 @@ async def delete_game(
     db.delete(game)
     db.commit()
     return None
+
+# ASIM THIS IS NEW!!
+@router.get("/top-rated/", response_model=List[schemas.GameDetailOut])
+async def get_top_rated_games(
+    db: Session = Depends(get_db),
+    limit: int = 10
+):
+    """
+    Get games with average rating higher than the overall average.
+    NESTED QUERY: Uses a subquery to calculate overall average.
+    """
+    from sqlalchemy import func
+    
+    # Subquery: Calculate overall average rating
+    overall_avg_subquery = db.query(
+        func.avg(Review.rating).label('overall_avg')
+    ).scalar_subquery()
+    
+    # Subquery: Games with above-average ratings
+    above_avg_games_subquery = db.query(
+        Review.game_id
+    ).group_by(
+        Review.game_id
+    ).having(
+        func.avg(Review.rating) > overall_avg_subquery
+    ).subquery()
+    
+    # Main query: Get game details
+    games = db.query(Game).filter(
+        Game.game_id.in_(
+            db.query(above_avg_games_subquery.c.game_id)
+        )
+    ).limit(limit).all()
+    
+    result = []
+    for game in games:
+        game_dict = {
+            "game_id": game.game_id,
+            "external_api_id": game.external_api_id,
+            "title": game.title,
+            "developer": game.developer,
+            "release_date": game.release_date,
+            "cover_image_url": game.cover_image_url,
+            "genres": [g.genre for g in game.genres],
+            "platforms": [p.platform for p in game.platforms]
+        }
+        result.append(schemas.GameDetailOut(**game_dict))
+    
+    return result
+
+# ASIM THIS IS NEW
+@router.get("/statistics/")
+async def get_game_statistics(
+    db: Session = Depends(get_db),
+    min_reviews: int = 1
+):
+    
+    # Build query with joins and aggregates
+    stats_query = db.query(
+        Game.game_id,
+        Game.title,
+        Game.developer,
+        func.count(func.distinct(Review.review_id)).label('review_count'),
+        func.avg(Review.rating).label('average_rating'),
+        func.count(func.distinct(UserGames.user_id)).label('user_count'),
+        func.count(func.distinct(PlaySession.session_id)).label('total_sessions')
+    ).outerjoin(
+        Review, Game.game_id == Review.game_id
+    ).outerjoin(
+        UserGames, Game.game_id == UserGames.game_id
+    ).outerjoin(
+        PlaySession, Game.game_id == PlaySession.game_id
+    ).group_by(
+        Game.game_id, Game.title, Game.developer
+    ).having(
+        func.count(func.distinct(Review.review_id)) >= min_reviews
+    ).order_by(
+        func.avg(Review.rating).desc(),
+        func.count(func.distinct(Review.review_id)).desc()
+    ).all()
+    
+    stats = []
+    for row in stats_query:
+        stats.append({
+            "game_id": row.game_id,
+            "title": row.title,
+            "developer": row.developer,
+            "review_count": row.review_count,
+            "average_rating": float(row.average_rating) if row.average_rating else 0.0,
+            "user_count": row.user_count,
+            "total_sessions": row.total_sessions
+        })
+    
+    return stats

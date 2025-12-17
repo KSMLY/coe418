@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, LogOut, Library, Star, Calendar, Gamepad2, Plus, Loader, AlertCircle, MessageSquare, Edit2, Trash2, User, Users, Clock, BarChart3, Award, Play, Square, Check, X, Send, ArrowLeft, Upload} from 'lucide-react';
 
 // API Configuration
-const API_BASE = 'https://localhost/api';
+const API_BASE = '/api';
 
 // API Helper
 const api = {

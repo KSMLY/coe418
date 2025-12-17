@@ -123,3 +123,59 @@ async def change_user_role(
     db.commit()
     db.refresh(user)
     return user
+
+# ASIM THIS IS NEW
+@router.get("/active-users/", response_model=List[schemas.UserPublicOut])
+async def get_active_users(
+    db: Session = Depends(get_db),
+    limit: int = 50
+):
+    """
+    Get users who are active (have reviews OR games in collection).
+    SET OPERATION: Uses UNION to combine two result sets.
+    """
+    from sqlalchemy import union
+    
+    # Query 1: Users who have written reviews
+    users_with_reviews = db.query(
+        User.user_id,
+        User.username,
+        User.display_name,
+        User.profile_picture_url,
+        User.role,
+        User.join_date
+    ).join(
+        Review, User.user_id == Review.user_id
+    ).distinct()
+    
+    # Query 2: Users who have games in collection
+    users_with_games = db.query(
+        User.user_id,
+        User.username,
+        User.display_name,
+        User.profile_picture_url,
+        User.role,
+        User.join_date
+    ).join(
+        UserGames, User.user_id == UserGames.user_id
+    ).distinct()
+    
+    # UNION: Combine both queries
+    combined_query = union(users_with_reviews, users_with_games).order_by(
+        User.join_date.desc()
+    ).limit(limit)
+    
+    result = db.execute(combined_query).all()
+    
+    users = []
+    for row in result:
+        users.append(schemas.UserPublicOut(
+            user_id=row.user_id,
+            username=row.username,
+            display_name=row.display_name,
+            profile_picture_url=row.profile_picture_url,
+            role=Role(row.role),
+            join_date=row.join_date
+        ))
+    
+    return users

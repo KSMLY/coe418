@@ -55,7 +55,6 @@ services:
       context: srcs/frontend
       dockerfile: Dockerfile
     container_name: gamehub-frontend
-   
     networks:
       - gamehub-network
     restart: unless-stopped
