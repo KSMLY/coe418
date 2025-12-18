@@ -2477,6 +2477,281 @@ function ProfilePage({ userId, isOwnProfile, onClose }) {
   );
 }
 
+// Analytics Page Component
+function AnalyticsPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [topRatedGames, setTopRatedGames] = useState([]);
+  const [gameStats, setGameStats] = useState([]);
+  const [activeUsers, setActiveUsers] = useState([]);
+  const [activeTab, setActiveTab] = useState('top-rated');
+
+  useEffect(() => {
+    loadAnalytics();
+  }, []);
+
+  const loadAnalytics = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [topRated, stats, users] = await Promise.all([
+        api.get('/games/top-rated/?limit=10'),
+        api.get('/games/statistics/?min_reviews=1'),
+        api.get('/users/active-users/?limit=20')
+      ]);
+      
+      setTopRatedGames(topRated);
+      setGameStats(stats);
+      setActiveUsers(users);
+    } catch (err) {
+      setError('Failed to load analytics: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center text-slate-400 py-12">
+        <Loader className="w-8 h-8 animate-spin mx-auto mb-2" />
+        <p>Loading analytics...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="bg-red-500/20 border border-red-500 text-red-200 px-4 py-3 rounded flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError('')} className="text-xl font-bold">×</button>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-900 to-blue-900 rounded-lg p-6">
+        <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+          <BarChart3 className="w-8 h-8" />
+          GameHub Analytics
+        </h2>
+        <p className="text-slate-300">Advanced database insights and statistics</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('top-rated')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'top-rated' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Award className="w-4 h-4" />
+          Top Rated Games
+          <span className="bg-purple-700 px-2 py-0.5 rounded text-xs">NESTED QUERY</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('game-stats')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'game-stats' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Game Statistics
+          <span className="bg-purple-700 px-2 py-0.5 rounded text-xs">GROUP BY</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('active-users')}
+          className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+            activeTab === 'active-users' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Active Users
+          <span className="bg-purple-700 px-2 py-0.5 rounded text-xs">UNION</span>
+        </button>
+      </div>
+
+      {/* Content */}
+      {activeTab === 'top-rated' && (
+        <div className="space-y-4">
+          <div className="bg-slate-800 rounded-lg p-4 border border-purple-500/30">
+            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <Award className="w-5 h-5 text-yellow-400" />
+              Top Rated Games (Above Average)
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Games with ratings higher than the community average • Uses nested subquery to calculate overall average rating
+            </p>
+          </div>
+
+          {topRatedGames.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {topRatedGames.map((game) => (
+                <div key={game.game_id} className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-purple-500 transition-colors">
+                  <div className="flex items-start gap-3">
+                    {game.cover_image_url ? (
+                      <img 
+                        src={game.cover_image_url} 
+                        alt={game.title} 
+                        className="w-20 h-20 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-slate-600 rounded flex items-center justify-center">
+                        <Gamepad2 className="w-8 h-8 text-slate-400" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <h4 className="text-white font-semibold mb-1">{game.title}</h4>
+                      <p className="text-slate-400 text-sm mb-2">{game.developer || 'Unknown'}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {game.genres && game.genres.map((genre) => (
+                          <span key={genre} className="bg-purple-600/30 text-purple-300 px-2 py-0.5 rounded text-xs">
+                            {genre}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <Award className="w-6 h-6 text-yellow-400" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-slate-400 py-12 bg-slate-800 rounded-lg">
+              <Award className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+              <p>No games with above-average ratings yet</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'game-stats' && (
+        <div className="space-y-4">
+          <div className="bg-slate-800 rounded-lg p-4 border border-purple-500/30">
+            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-blue-400" />
+              Comprehensive Game Statistics
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Aggregated data across reviews, collections, and play sessions • Uses GROUP BY with multiple JOINs and aggregate functions
+            </p>
+          </div>
+
+          {gameStats.length > 0 ? (
+            <div className="space-y-3">
+              {gameStats.slice(0, 10).map((stat) => (
+                <div key={stat.game_id} className="bg-slate-700 rounded-lg p-4 border border-slate-600">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h4 className="text-white font-semibold">{stat.title}</h4>
+                      <p className="text-slate-400 text-sm">{stat.developer || 'Unknown Developer'}</p>
+                    </div>
+                    {stat.average_rating > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                        <span className="text-white font-bold">{stat.average_rating.toFixed(1)}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-slate-800 rounded p-3 text-center">
+                      <MessageSquare className="w-5 h-5 text-blue-400 mx-auto mb-1" />
+                      <p className="text-white font-bold">{stat.review_count}</p>
+                      <p className="text-slate-400 text-xs">Reviews</p>
+                    </div>
+                    <div className="bg-slate-800 rounded p-3 text-center">
+                      <Users className="w-5 h-5 text-green-400 mx-auto mb-1" />
+                      <p className="text-white font-bold">{stat.user_count}</p>
+                      <p className="text-slate-400 text-xs">In Collections</p>
+                    </div>
+                    <div className="bg-slate-800 rounded p-3 text-center">
+                      <Clock className="w-5 h-5 text-purple-400 mx-auto mb-1" />
+                      <p className="text-white font-bold">{stat.total_sessions}</p>
+                      <p className="text-slate-400 text-xs">Play Sessions</p>
+                    </div>
+                    <div className="bg-slate-800 rounded p-3 text-center">
+                      <BarChart3 className="w-5 h-5 text-yellow-400 mx-auto mb-1" />
+                      <p className="text-white font-bold">
+                        {stat.average_rating > 0 ? stat.average_rating.toFixed(1) : 'N/A'}
+                      </p>
+                      <p className="text-slate-400 text-xs">Avg Rating</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-slate-400 py-12 bg-slate-800 rounded-lg">
+              <BarChart3 className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+              <p>No game statistics available yet</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'active-users' && (
+        <div className="space-y-4">
+          <div className="bg-slate-800 rounded-lg p-4 border border-purple-500/30">
+            <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+              <Users className="w-5 h-5 text-green-400" />
+              Active Community Members
+            </h3>
+            <p className="text-slate-400 text-sm mb-4">
+              Users with either game collections or reviews • Uses UNION set operation to combine two distinct queries
+            </p>
+          </div>
+
+          {activeUsers.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {activeUsers.map((user) => (
+                <div 
+                  key={user.user_id} 
+                  className="bg-slate-700 rounded-lg p-4 border border-slate-600 hover:border-purple-500 transition-colors cursor-pointer"
+                  onClick={() => window.dispatchEvent(new CustomEvent('viewProfile', { detail: user.user_id }))}
+                >
+                  <div className="flex flex-col items-center text-center">
+                    {user.profile_picture_url ? (
+                      <img 
+                        src={getImageUrl(user.profile_picture_url)} 
+                        alt={user.username}
+                        className="w-16 h-16 rounded-full object-cover mb-3"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mb-3">
+                        <User className="w-8 h-8 text-white" />
+                      </div>
+                    )}
+                    <h4 className="text-white font-semibold mb-1">
+                      {user.display_name || user.username}
+                    </h4>
+                    <p className="text-slate-400 text-sm mb-2">@{user.username}</p>
+                    {user.role === 'ADMIN' && (
+                      <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-xs">
+                        ADMIN
+                      </span>
+                    )}
+                    <p className="text-slate-500 text-xs mt-2">
+                      Joined {new Date(user.join_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center text-slate-400 py-12 bg-slate-800 rounded-lg">
+              <Users className="w-16 h-16 mx-auto mb-4 text-slate-600" />
+              <p>No active users found</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Main App Component
 function GameHub() {
@@ -2698,6 +2973,16 @@ function GameHub() {
                 <Users className="w-4 h-4" />
                 Friends ({friendsCount})
               </button>
+			  <button
+				  onClick={() => setActiveTab('analytics')}
+				  className={`flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap ${
+					activeTab === 'analytics' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300'
+				  }`}
+				>
+				  <BarChart3 className="w-4 h-4" />
+				  Analytics
+				</button>
+			  
               <button
                 onClick={() => setViewingProfile('own')}
                 className="flex items-center gap-2 px-4 py-2 rounded whitespace-nowrap bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -2708,11 +2993,13 @@ function GameHub() {
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'friends' ? (
-              <FriendsPage onFriendsUpdate={(count) => setFriendsCount(count)} />
-            ) : activeTab === 'sessions' ? (
-              <PlaySessionsPage />
-            ) : (
+			{activeTab === 'friends' ? (
+			  <FriendsPage onFriendsUpdate={(count) => setFriendsCount(count)} />
+			) : activeTab === 'sessions' ? (
+			  <PlaySessionsPage />
+			) : activeTab === 'analytics' ? (
+			  <AnalyticsPage />
+			) : (
               <>
                 {activeTab === 'discover' && (
                   <div className="mb-6">
