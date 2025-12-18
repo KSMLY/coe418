@@ -4,7 +4,7 @@ from sqlalchemy import or_, func
 from typing import List, Optional
 
 from database import get_db
-from models import Game, GameGenre, GamePlatform
+from models import Game, GameGenre, GamePlatform, Review, UserGames, PlaySession
 from dependencies import CurrentAdmin, CurrentUser
 from services.rawg import rawg_service
 import schemas

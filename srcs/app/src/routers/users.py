@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_  
+from sqlalchemy import or_, union 
 from typing import List
 
 from database import get_db
-from models import Role, User
+from models import Role, User, Review, UserGames  
 from dependencies import CurrentUser, CurrentAdmin
 import schemas
 
