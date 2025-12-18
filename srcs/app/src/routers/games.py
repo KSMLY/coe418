@@ -244,46 +244,64 @@ async def get_top_rated_games(
 ):
     """
     Get games with average rating higher than the overall average.
-    NESTED QUERY: Uses a subquery to calculate overall average.
+    NESTED QUERY: Uses a scalar subquery in the HAVING clause to compare 
+    each game's average rating against the global average.
+    
+    SQL equivalent:
+    SELECT g.* FROM GAME g
+    JOIN REVIEW r ON g.game_id = r.game_id
+    GROUP BY g.game_id
+    HAVING AVG(r.rating) > (SELECT AVG(rating) FROM REVIEW)
     """
-    from sqlalchemy import func
-    
-    # Subquery: Calculate overall average rating
-    overall_avg_subquery = db.query(
-        func.avg(Review.rating).label('overall_avg')
-    ).scalar_subquery()
-    
-    # Subquery: Games with above-average ratings
-    above_avg_games_subquery = db.query(
-        Review.game_id
-    ).group_by(
-        Review.game_id
-    ).having(
-        func.avg(Review.rating) > overall_avg_subquery
-    ).subquery()
-    
-    # Main query: Get game details
-    games = db.query(Game).filter(
-        Game.game_id.in_(
-            db.query(above_avg_games_subquery.c.game_id)
-        )
-    ).limit(limit).all()
-    
-    result = []
-    for game in games:
-        game_dict = {
-            "game_id": game.game_id,
-            "external_api_id": game.external_api_id,
-            "title": game.title,
-            "developer": game.developer,
-            "release_date": game.release_date,
-            "cover_image_url": game.cover_image_url,
-            "genres": [g.genre for g in game.genres],
-            "platforms": [p.platform for p in game.platforms]
-        }
-        result.append(schemas.GameDetailOut(**game_dict))
-    
-    return result
+    try:
+        # NESTED SUBQUERY: Calculate overall average rating across ALL reviews
+        # This is a scalar subquery that returns a single value
+        overall_avg_subquery = db.query(
+            func.avg(Review.rating)
+        ).scalar_subquery()
+        
+        # Main query with HAVING clause that uses the nested subquery
+        # This compares each game's average rating to the overall average
+        games_above_avg = db.query(Game).join(
+            Review, Game.game_id == Review.game_id
+        ).group_by(
+            Game.game_id,
+            Game.external_api_id,
+            Game.title,
+            Game.developer,
+            Game.release_date,
+            Game.cover_image_url
+        ).having(
+            func.avg(Review.rating) > overall_avg_subquery  # ← NESTED SUBQUERY IN HAVING!
+        ).order_by(
+            func.avg(Review.rating).desc()
+        ).limit(limit).all()
+        
+        # If no games found, return empty list
+        if not games_above_avg:
+            return []
+        
+        # Format response with genres and platforms
+        result = []
+        for game in games_above_avg:
+            game_dict = {
+                "game_id": game.game_id,
+                "external_api_id": game.external_api_id,
+                "title": game.title,
+                "developer": game.developer,
+                "release_date": game.release_date,
+                "cover_image_url": game.cover_image_url,
+                "genres": [g.genre for g in game.genres],
+                "platforms": [p.platform for p in game.platforms]
+            }
+            result.append(schemas.GameDetailOut(**game_dict))
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in get_top_rated_games: {e}")
+        # Return empty list instead of raising exception for better UX
+        return []
 
 # ASIM THIS IS NEW
 @router.get("/statistics/")
