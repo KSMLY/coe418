@@ -132,72 +132,46 @@ async def get_active_users(
 ):
     """
     Get users who are active (have reviews OR games in collection).
-    SET OPERATION: Uses UNION to combine two result sets.
+    SET OPERATION: Uses UNION concept by combining two distinct queries.
     """
     try:
-        from sqlalchemy import union_all, distinct
-        
-        # Query 1: Users who have written reviews
-        users_with_reviews = db.query(
-            User.user_id,
-            User.username,
-            User.display_name,
-            User.profile_picture_url,
-            User.role,
-            User.join_date
+        # Query 1: Get user IDs who have written reviews
+        users_with_reviews_ids = db.query(
+            User.user_id
         ).join(
             Review, User.user_id == Review.user_id
-        ).distinct()
+        ).distinct().all()
         
-        # Query 2: Users who have games in collection
-        users_with_games = db.query(
-            User.user_id,
-            User.username,
-            User.display_name,
-            User.profile_picture_url,
-            User.role,
-            User.join_date
+        # Query 2: Get user IDs who have games in collection
+        users_with_games_ids = db.query(
+            User.user_id
         ).join(
             UserGames, User.user_id == UserGames.user_id
-        ).distinct()
+        ).distinct().all()
         
-        # UNION: Combine both queries and remove duplicates
-        # Use union_all first, then apply distinct on the result
-        combined = union_all(
-            users_with_reviews.statement,
-            users_with_games.statement
-        )
+        # UNION: Combine and get unique user IDs (simulates UNION operation)
+        active_user_ids = set()
+        for (user_id,) in users_with_reviews_ids:
+            active_user_ids.add(user_id)
+        for (user_id,) in users_with_games_ids:
+            active_user_ids.add(user_id)
         
-        # Execute the union and get distinct results
-        result = db.execute(
-            select(
-                combined.c.user_id,
-                combined.c.username,
-                combined.c.display_name,
-                combined.c.profile_picture_url,
-                combined.c.role,
-                combined.c.join_date
-            ).distinct().order_by(
-                combined.c.join_date.desc()
-            ).limit(limit)
-        ).fetchall()
+        if not active_user_ids:
+            return []
         
-        # Convert to UserPublicOut objects
-        users = []
-        for row in result:
-            users.append(schemas.UserPublicOut(
-                user_id=row.user_id,
-                username=row.username,
-                display_name=row.display_name,
-                profile_picture_url=row.profile_picture_url,
-                role=Role(row.role) if isinstance(row.role, str) else row.role,
-                join_date=row.join_date
-            ))
+        # Fetch full user details for these IDs
+        users = db.query(User).filter(
+            User.user_id.in_(active_user_ids)
+        ).order_by(
+            User.join_date.desc()
+        ).limit(limit).all()
         
         return users
         
     except Exception as e:
         print(f"Error in get_active_users: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch active users: {str(e)}"

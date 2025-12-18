@@ -2478,6 +2478,7 @@ function ProfilePage({ userId, isOwnProfile, onClose }) {
 }
 
 // Analytics Page Component
+
 function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -2494,16 +2495,46 @@ function AnalyticsPage() {
     setLoading(true);
     setError('');
     try {
-      const [topRated, stats, users] = await Promise.all([
+      // Load all three endpoints with individual error handling
+      const [topRatedResult, statsResult, usersResult] = await Promise.allSettled([
         api.get('/games/top-rated/?limit=10'),
         api.get('/games/statistics/?min_reviews=1'),
         api.get('/users/active-users/?limit=20')
       ]);
       
-      setTopRatedGames(topRated);
-      setGameStats(stats);
-      setActiveUsers(users);
+      // Handle top rated games
+      if (topRatedResult.status === 'fulfilled') {
+        setTopRatedGames(Array.isArray(topRatedResult.value) ? topRatedResult.value : []);
+      } else {
+        console.error('Top rated games error:', topRatedResult.reason);
+        setTopRatedGames([]);
+      }
+      
+      // Handle game statistics
+      if (statsResult.status === 'fulfilled') {
+        setGameStats(Array.isArray(statsResult.value) ? statsResult.value : []);
+      } else {
+        console.error('Game stats error:', statsResult.reason);
+        setGameStats([]);
+      }
+      
+      // Handle active users
+      if (usersResult.status === 'fulfilled') {
+        setActiveUsers(Array.isArray(usersResult.value) ? usersResult.value : []);
+      } else {
+        console.error('Active users error:', usersResult.reason);
+        setActiveUsers([]);
+      }
+      
+      // Only show error if ALL requests failed
+      if (topRatedResult.status === 'rejected' && 
+          statsResult.status === 'rejected' && 
+          usersResult.status === 'rejected') {
+        setError('Failed to load analytics data');
+      }
+      
     } catch (err) {
+      console.error('Analytics error:', err);
       setError('Failed to load analytics: ' + err.message);
     } finally {
       setLoading(false);
@@ -2549,7 +2580,7 @@ function AnalyticsPage() {
           }`}
         >
           <Award className="w-4 h-4" />
-          Top Rated Games
+          Top Rated Games ({topRatedGames.length})
           <span className="bg-purple-700 px-2 py-0.5 rounded text-xs">NESTED QUERY</span>
         </button>
         <button
@@ -2559,7 +2590,7 @@ function AnalyticsPage() {
           }`}
         >
           <BarChart3 className="w-4 h-4" />
-          Game Statistics
+          Game Statistics ({gameStats.length})
           <span className="bg-purple-700 px-2 py-0.5 rounded text-xs">GROUP BY</span>
         </button>
         <button
@@ -2569,7 +2600,7 @@ function AnalyticsPage() {
           }`}
         >
           <Users className="w-4 h-4" />
-          Active Users
+          Active Users ({activeUsers.length})
           <span className="bg-purple-700 px-2 py-0.5 rounded text-xs">UNION</span>
         </button>
       </div>
@@ -2623,6 +2654,7 @@ function AnalyticsPage() {
             <div className="text-center text-slate-400 py-12 bg-slate-800 rounded-lg">
               <Award className="w-16 h-16 mx-auto mb-4 text-slate-600" />
               <p>No games with above-average ratings yet</p>
+              <p className="text-sm mt-2">Games need reviews to appear here</p>
             </div>
           )}
         </div>
@@ -2645,9 +2677,22 @@ function AnalyticsPage() {
               {gameStats.slice(0, 10).map((stat) => (
                 <div key={stat.game_id} className="bg-slate-700 rounded-lg p-4 border border-slate-600">
                   <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h4 className="text-white font-semibold">{stat.title}</h4>
-                      <p className="text-slate-400 text-sm">{stat.developer || 'Unknown Developer'}</p>
+                    <div className="flex items-start gap-3">
+                      {stat.cover_image_url ? (
+                        <img 
+                          src={stat.cover_image_url} 
+                          alt={stat.title} 
+                          className="w-16 h-16 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 bg-slate-600 rounded flex items-center justify-center">
+                          <Gamepad2 className="w-8 h-8 text-slate-400" />
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="text-white font-semibold">{stat.title}</h4>
+                        <p className="text-slate-400 text-sm">{stat.developer || 'Unknown Developer'}</p>
+                      </div>
                     </div>
                     {stat.average_rating > 0 && (
                       <div className="flex items-center gap-1">
@@ -2688,6 +2733,7 @@ function AnalyticsPage() {
             <div className="text-center text-slate-400 py-12 bg-slate-800 rounded-lg">
               <BarChart3 className="w-16 h-16 mx-auto mb-4 text-slate-600" />
               <p>No game statistics available yet</p>
+              <p className="text-sm mt-2">Add games and reviews to see statistics</p>
             </div>
           )}
         </div>
@@ -2745,6 +2791,7 @@ function AnalyticsPage() {
             <div className="text-center text-slate-400 py-12 bg-slate-800 rounded-lg">
               <Users className="w-16 h-16 mx-auto mb-4 text-slate-600" />
               <p>No active users found</p>
+              <p className="text-sm mt-2">Users need to add games or write reviews</p>
             </div>
           )}
         </div>
